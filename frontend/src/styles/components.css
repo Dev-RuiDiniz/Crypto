@@ -1,0 +1,555 @@
+/* frontend/src/styles/components.css - CORRIGIDO */
+
+/* =========================
+   VARIÁVEIS
+   ========================= */
+:root {
+  --orange-primary: #FF6B35;
+  --orange-secondary: #FF8E53;
+  --orange-dark: #D45A00;
+  --orange-light: #FF9E6D;
+  --orange-gradient: linear-gradient(135deg, #FF6B35 0%, #FF8E53 100%);
+  --orange-shadow: rgba(255, 107, 53, 0.25);
+  --bg-dark: #0A0A0F;
+  --bg-card: #111116;
+  --bg-panel: #0F0F14;
+  --border-dark: #222228;
+  --border-light: #333338;
+  --text-primary: #F0F0F5;
+  --text-secondary: #A0A0B0;
+  --text-muted: #707080;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
+  --border-radius: 12px;
+}
+
+/* =========================
+   TABS CORRIGIDAS
+   ========================= */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  text-align: center;
+}
+
+.tab-button:hover {
+  background: rgba(255, 107, 53, 0.1);
+  color: var(--orange-light);
+}
+
+.tab-button-active {
+  background: var(--orange-gradient);
+  color: white;
+  box-shadow: 0 4px 12px var(--orange-shadow);
+  border: 1px solid var(--orange-primary);
+}
+
+/* =========================
+   FORMULÁRIOS CORRIGIDOS
+   ========================= */
+.config-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.form-section h3 {
+  color: var(--orange-primary);
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-dark);
+  font-size: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.form-row {
+  margin-bottom: 16px;
+}
+
+.form-row label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-row input,
+.form-row select,
+.form-row textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.form-row input:focus,
+.form-row select:focus,
+.form-row textarea:focus {
+  border-color: var(--orange-primary);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  outline: none;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-dark);
+}
+
+.btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--orange-gradient);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--orange-shadow);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-panel);
+}
+
+/* =========================
+   TABELAS
+   ========================= */
+/* 
+  Correções-chave:
+  - Removido min-width global que fazia a tabela "vazar" do grid.
+  - Removido sticky global do thead (isso estava sobrepondo textos ao rolar a página).
+  - Adicionado wrapper .table-wrapper (o Dashboard usa essa classe).
+  - Classes utilitárias opcionais: .table--wide e .table--sticky-head (para usar onde fizer sentido).
+*/
+
+.table-container,
+.table-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-dark);
+  background: var(--bg-card);
+  margin: 16px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 0; /* <- impede overflow em grids */
+}
+
+.table thead {
+  background: var(--bg-panel);
+}
+
+/* Use SOMENTE quando quiser header fixo dentro de um container com scroll */
+.table--sticky-head thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* Use SOMENTE quando a tabela for naturalmente larga (ex.: ordens) */
+.table--wide {
+  min-width: 920px;
+}
+
+.table th {
+  padding: 16px;
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-dark);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table th:not(:last-child) {
+  border-right: 1px solid var(--border-dark);
+}
+
+.table td {
+  padding: 16px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-dark);
+  font-size: 14px;
+  white-space: nowrap; /* evita quebra que bagunça o grid */
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: rgba(255, 107, 53, 0.05);
+}
+
+.table td:first-child,
+.table th:first-child {
+  padding-left: 24px;
+}
+
+.table td:last-child,
+.table th:last-child {
+  padding-right: 24px;
+}
+
+/* Células numéricas */
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+/* Status colors */
+.cell-success { color: var(--success); }
+.cell-warning { color: var(--warning); }
+.cell-danger  { color: var(--danger); }
+.cell-info    { color: var(--orange-primary); }
+
+/* =========================
+   CARDS DE SALDO
+   ========================= */
+/* Base genérico para cards (Dashboard usa className="card") */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  padding: 20px;
+}
+
+.card h3 {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Se um card tiver tabela, evita que a tabela encoste no border */
+.card .table-container,
+.card .table-wrapper {
+  margin: 12px 0 0;
+}
+
+.balances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+
+/* Compat: Dashboard renderiza cards de saldo com className="card" */
+.balances-grid > .card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.balances-grid > .card:hover {
+  border-color: var(--orange-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Dentro do grid de saldos, a tabela deve ser compacta */
+.balances-grid > .card .table {
+  min-width: 0;
+}
+
+.balance-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.balance-card:hover {
+  border-color: var(--orange-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.balance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.balance-exchange {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.balance-currency {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-right: 8px;
+  min-width: 60px;
+}
+
+.balance-amount {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-usd {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* =========================
+   MIDS CORRIGIDOS
+   ========================= */
+.mids-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.mids-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.mids-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.pair-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pair-selector select {
+  padding: 8px 12px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  min-width: 150px;
+}
+
+.mids-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.mid-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dark);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.mid-card:hover {
+  border-color: var(--orange-primary);
+  transform: translateY(-2px);
+}
+
+.mid-exchange {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mid-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--orange-primary);
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+/* Compat: Dashboard usa .mids-line (lista simples de mids) */
+.mids-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.mids-line span {
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dark);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+/* =========================
+   ORDENS
+   ========================= */
+.orders-section {
+  margin: 20px 0;
+}
+
+.order-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.order-filter-btn {
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.order-filter-btn:hover {
+  border-color: var(--orange-primary);
+  color: var(--orange-light);
+}
+
+.order-filter-btn.active {
+  background: var(--orange-gradient);
+  color: white;
+  border-color: var(--orange-primary);
+}
+
+/* =========================
+   RESPONSIVIDADE
+   ========================= */
+@media (max-width: 768px) {
+  .table-container,
+  .table-wrapper {
+    margin: 0 -20px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .balances-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mids-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .mids-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .pair-selector {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .mids-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-filters {
+    justify-content: center;
+  }
+  
+  .tab-button {
+    min-width: 100px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}

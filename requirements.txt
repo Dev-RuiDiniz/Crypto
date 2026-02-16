@@ -1,0 +1,15 @@
+# requirements.txt
+
+# Core
+ccxt==4.3.92
+aiohttp==3.10.8
+tenacity==8.2.3
+
+# Utilidades
+pytz==2024.2
+colorama==0.4.6
+
+# --- Opcionais (comentados) ---
+# aiodns==3.2.0           # opcional: acelera resolução DNS para aiohttp
+# python-dotenv==1.0.1    # opcional: carregar variáveis de ambiente de um .env
+# typing-extensions==4.12.2  # só se rodar Python < 3.8 (não é seu caso)

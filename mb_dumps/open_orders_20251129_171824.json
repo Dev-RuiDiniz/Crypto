@@ -1,0 +1,47 @@
+{
+  "data": {
+    "items": [
+      {
+        "created_at": 1761870928,
+        "filledQty": "0.02",
+        "id": "01K8VV1PVPCCGH62N2TXN3F0VQ",
+        "instrument": "SOL-BRL",
+        "limitPrice": 996.81,
+        "qty": "0.02",
+        "side": "buy",
+        "status": "filled",
+        "triggerOrderId": "12829324424",
+        "type": "limit",
+        "updated_at": 1761870928
+      },
+      {
+        "created_at": 1761870910,
+        "filledQty": "9.5",
+        "id": "01K8VV14NG545FCHJG3T5NZA9V",
+        "instrument": "USDT-BRL",
+        "limitPrice": 5.3997,
+        "qty": "9.5",
+        "side": "sell",
+        "status": "filled",
+        "triggerOrderId": "12829320150",
+        "type": "limit",
+        "updated_at": 1761870910
+      },
+      {
+        "created_at": 1761870353,
+        "filledQty": "0.01",
+        "id": "01K8VTG55BP66XG7QH9BTZC53S",
+        "instrument": "SOL-BRL",
+        "limitPrice": 997.9,
+        "qty": "0.01",
+        "side": "buy",
+        "status": "filled",
+        "triggerOrderId": "12829201310",
+        "type": "limit",
+        "updated_at": 1761870353
+      }
+    ]
+  },
+  "http_status": 200,
+  "path": "/accounts/860457a62a5da51837bdce01b6eb63523d597dadff8c083520bce955e9a21605/orders"
+}

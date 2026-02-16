@@ -1,0 +1,573 @@
+/* frontend/src/styles/main.css - TEMA LARANJA MODERNO (CORRIGIDO)
+   Objetivo: travar grid/overflow, alinhar classes com Dashboard.js, e não reintroduzir bugs de tabela.
+*/
+
+/* =========================
+   TOKENS / VARIÁVEIS (FONTE ÚNICA)
+   ========================= */
+:root {
+  --orange-primary: #FF6B35;
+  --orange-secondary: #FF8E53;
+  --orange-dark: #D45A00;
+  --orange-light: #FF9E6D;
+  --orange-gradient: linear-gradient(135deg, #FF6B35 0%, #FF8E53 100%);
+  --orange-shadow: rgba(255, 107, 53, 0.30);
+
+  --bg-dark: #0A0A0F;
+  --bg-card: #111116;
+  --bg-panel: #0F0F14;
+
+  --border-dark: #222228;
+  --border-light: #333338;
+
+  --text-primary: #F0F0F5;
+  --text-secondary: #A0A0B0;
+  --text-muted: #707080;
+
+  /* estados */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
+
+  /* layout */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+
+  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.30);
+  --shadow-hover: 0 14px 38px rgba(0, 0, 0, 0.36);
+
+  --container-max: 1320px;
+
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+}
+
+/* =========================
+   BASE / RESET
+   ========================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================
+   APP ROOT (CENTRALIZA E ORGANIZA)
+   ========================= */
+.app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at 50% 0%, #1A1A23 0%, var(--bg-dark) 70%);
+}
+
+/* Container padrão */
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* =========================
+   HEADER DO APP
+   ========================= */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-dark);
+
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+/* Suporta dois cenários:
+   1) Você usar .app-header-inner
+   2) Seu markup ser .app-header > div (como no seu App.js antigo)
+*/
+.app-header-inner,
+.app-header > div {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .app-header-inner,
+  .app-header > div {
+    padding: 0 var(--space-4);
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+
+  background: var(--orange-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-header span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* =========================
+   ÁREA PRINCIPAL
+   ========================= */
+.app-main {
+  flex: 1;
+  padding: var(--space-5) 0;
+  overflow: auto;
+  position: relative;
+}
+
+/* =========================
+   STATUS DO DASHBOARD
+   ========================= */
+.dashboard-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-indicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--orange-primary);
+  box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.0);
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.0); }
+  50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(255, 107, 53, 0.08); }
+}
+
+/* =========================
+   LAYOUT DO DASHBOARD
+   ========================= */
+.dashboard-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  height: 100%;
+  min-width: 0; /* fundamental em grids */
+}
+
+/* Compat antigo */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* Novo: usado no Dashboard.js ajustado */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* Permite que os itens do grid encolham sem "vazar" */
+.dashboard-layout > *,
+.dashboard-grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-layout,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-left,
+.dashboard-right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* =========================
+   PAINÉIS / CARDS
+   ========================= */
+.panel {
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  border: 1px solid var(--border-dark);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  position: relative;
+
+  /* IMPORTANTE: não esconder overflow aqui, senão mobile full-bleed e tabelas podem ser cortadas */
+  overflow: visible;
+  min-width: 0;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--orange-gradient);
+}
+
+.panel:hover {
+  border-color: var(--border-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: -0.2px;
+}
+
+.panel-header h2::before {
+  content: '';
+  width: 4px;
+  height: 18px;
+  background: var(--orange-gradient);
+  border-radius: 4px;
+}
+
+.panel-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+
+  /* antes estava nowrap e isso estourava layout */
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.panel-footer-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* =========================
+   CARDS INTERNOS
+   ========================= */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  border: 1px solid var(--border-dark);
+  transition: border-color 0.18s ease, transform 0.18s ease;
+  min-width: 0;
+}
+
+.card:hover {
+  border-color: var(--border-light);
+}
+
+.card h3 {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* =========================
+   TABELAS (NÃO REINTRODUZIR BUGS)
+   ========================= */
+/*
+  ATENÇÃO: As regras completas/bonitas de tabela estão no components.css (corrigido).
+  Aqui mantemos apenas um "fallback" seguro, sem min-width fixo e sem sticky global.
+*/
+.table-wrapper,
+.table-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-dark);
+  background: var(--bg-card);
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  min-width: 0; /* CRUCIAL: evita vazamento em grid */
+}
+
+/* wide opcional (Dashboard.js usa para ordens) */
+.table--wide {
+  min-width: 920px;
+}
+
+/* sticky opcional (use só se quiser) */
+.table--sticky-head thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.table th,
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(34, 34, 40, 0.85);
+  white-space: nowrap;
+}
+
+.table th {
+  background: rgba(15, 15, 20, 0.98);
+  color: var(--text-secondary);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 11px;
+}
+
+.table tbody tr:hover td {
+  background: rgba(255, 107, 53, 0.06);
+}
+
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* =========================
+   SALDOS GRID
+   ========================= */
+.balances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* =========================
+   STATS / KPIs
+   ========================= */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: var(--space-5);
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  border: 1px solid var(--border-dark);
+  text-align: center;
+  transition: transform 0.22s ease, border-color 0.22s ease;
+}
+
+.stat-card:hover {
+  border-color: rgba(255, 107, 53, 0.75);
+  transform: translateY(-2px);
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--orange-primary);
+  margin: 10px 0 6px 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* =========================
+   LOADING E ERROR STATES (compat + novo)
+   ========================= */
+
+/* Novo (Dashboard.js atualizado usa .loading e .alert) */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.alert {
+  padding: 14px 14px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  color: var(--danger);
+}
+
+/* Compat antigo */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.loading-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--border-dark);
+  border-top: 3px solid var(--orange-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* =========================
+   RESPONSIVIDADE
+   ========================= */
+@media (max-width: 768px) {
+  .app-main {
+    padding: var(--space-4) 0;
+  }
+
+  .balances-grid,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tabela “full bleed” no mobile (não pode ser cortada pelo panel) */
+  .table-wrapper,
+  .table-container {
+    margin: 0 calc(var(--space-4) * -1);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+/* =========================
+   SCROLLBAR PERSONALIZADO
+   ========================= */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(17, 17, 22, 0.85);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 34, 40, 0.95);
+  border-radius: 6px;
+  transition: background 0.25s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 53, 0.75);
+}
+
+/* =========================
+   UTILITÁRIOS
+   ========================= */
+.text-orange { color: var(--orange-primary); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); }

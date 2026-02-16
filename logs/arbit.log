@@ -1,0 +1,931 @@
+2025-10-20 17:55:33 [INFO] ARBIT: ====================================================
+2025-10-20 17:55:33 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 17:55:33 [INFO] ARBIT: MODE=REAL                       ; REAL ou PAPER  REF=MEDIAN                ; MEDIAN ou VWAP (para "preço geral do ativo")  USDT_BRL_RATE=5.60              ; TODO: sua cotação manual do USDT em BRL (ex.: 5.60)
+2025-10-20 17:55:33 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT          ; TODO: adicione/remova conforme necessário
+2025-10-20 17:55:33 [INFO] ARBIT: LOOP_INTERVAL_MS=1200           ; intervalo do loop principal (coleta/decisão)  PRINT_EVERY_SEC=5               ; frequência de prints no terminal
+2025-10-20 17:55:33 [INFO] ARBIT: HEDGE_ON_FILL=false             ; true = ao executar uma ponta, faz hedge da outra
+2025-10-20 17:55:33 [INFO] ARBIT: ====================================================
+2025-10-20 17:58:05 [INFO] ARBIT: ====================================================
+2025-10-20 17:58:05 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 17:58:05 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 17:58:05 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 17:58:05 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 17:58:05 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 17:58:05 [INFO] ARBIT: ====================================================
+2025-10-20 17:58:14 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 17:58:20 [ERROR] monitor: [loop] erro: cannot unpack non-iterable NoneType object
+2025-10-20 17:58:25 [ERROR] monitor: [loop] erro: cannot unpack non-iterable NoneType object
+2025-10-20 17:58:30 [ERROR] monitor: [loop] erro: cannot unpack non-iterable NoneType object
+2025-10-20 17:58:34 [INFO] ARBIT: Finalizado.
+2025-10-20 18:03:59 [INFO] ARBIT: ====================================================
+2025-10-20 18:03:59 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:03:59 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:03:59 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:03:59 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:03:59 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:03:59 [INFO] ARBIT: ====================================================
+2025-10-20 18:04:02 [WARNING] exchanges: [mexc] load_markets falhou: mexc {"code":700003,"msg":"Timestamp for this request is outside of the recvWindow."}
+2025-10-20 18:04:08 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 18:04:13 [WARNING] monitor: [BTC/USDT] coletor: mexc (BTC/USDT) -> network | mexc {"code":700003,"msg":"Timestamp for this request is outside of the recvWindow."}
+2025-10-20 18:04:26 [ERROR] monitor: [loop] erro: mercado {"status_code":"201","error_message":"Valor de *TAPI-ID* inv\u00e1lido.","server_unix_timestamp":"1760994261","api_deprecated":"Importante: a vers\u00e3o que voc\u00ea est\u00e1 utilizando da nossa API est\u00e1 depreciada e ter\u00e1 seu suporte encerrado em 09 de Outubro de 2023. Recomendamos fortemente que utilize a nova API v4 para realizar suas negocia\u00e7\u00f5es. Important: the version you are using of our API is deprecated and its support will end on October 09, 2023. We strongly recommend that you use the new API v4 to carry out your trades. https://api.mercadobitcoin.net/api/v4/docs"}
+2025-10-20 18:04:31 [WARNING] monitor: [BTC/USDT] coletor: mexc (BTC/USDT) -> network | mexc {"code":700003,"msg":"Timestamp for this request is outside of the recvWindow."}
+2025-10-20 18:04:36 [WARNING] monitor: [ETH/USDT] coletor: mexc (ETH/USDT) -> network | mexc {"code":700003,"msg":"Timestamp for this request is outside of the recvWindow."}
+2025-10-20 18:04:43 [INFO] ARBIT: Finalizado.
+2025-10-20 18:45:16 [INFO] ARBIT: ====================================================
+2025-10-20 18:45:16 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:45:16 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:45:16 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:45:16 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:45:16 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:45:16 [INFO] ARBIT: ====================================================
+2025-10-20 18:45:16 [INFO] MainMonitor: MainMonitor placeholder em execução. Aguardando implementação dos módulos core/*.py
+2025-10-20 18:48:42 [INFO] ARBIT: Finalizado.
+2025-10-20 18:51:30 [INFO] ARBIT: ====================================================
+2025-10-20 18:51:30 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:51:30 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:51:30 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:51:30 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:51:30 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:51:30 [INFO] ARBIT: ====================================================
+2025-10-20 18:51:30 [INFO] MainMonitor: MainMonitor placeholder em execução. Aguardando implementação dos módulos core/*.py
+2025-10-20 18:52:27 [INFO] ARBIT: Finalizado.
+2025-10-20 18:52:30 [INFO] ARBIT: ====================================================
+2025-10-20 18:52:30 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:52:30 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:52:30 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:52:30 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:52:30 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:52:30 [INFO] ARBIT: ====================================================
+2025-10-20 18:55:02 [INFO] ARBIT: ====================================================
+2025-10-20 18:55:02 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:55:02 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:55:02 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:55:02 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:55:02 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:55:02 [INFO] ARBIT: ====================================================
+2025-10-20 18:57:56 [INFO] ARBIT: ====================================================
+2025-10-20 18:57:56 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 18:57:56 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 18:57:56 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 18:57:56 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 18:57:56 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 18:57:56 [INFO] ARBIT: ====================================================
+2025-10-20 19:01:31 [INFO] ARBIT: ====================================================
+2025-10-20 19:01:31 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 19:01:31 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 19:01:31 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 19:01:31 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 19:01:31 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 19:01:31 [INFO] ARBIT: ====================================================
+2025-10-20 19:09:19 [INFO] ARBIT: ====================================================
+2025-10-20 19:09:19 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 19:09:19 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 19:09:19 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 19:09:19 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 19:09:19 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 19:09:19 [INFO] ARBIT: ====================================================
+2025-10-20 19:09:30 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 19:09:37 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] Falha ao obter saldos: (404, {'code': 'API|ROUTE_NOT_FOUND', 'message': 'This route not found'}) — fallback: {}
+2025-10-20 19:09:37 [ERROR] monitor: [loop] erro: 'Adapters' object has no attribute 'round_price'
+2025-10-20 19:09:41 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] Falha ao obter saldos: (404, {'code': 'API|ROUTE_NOT_FOUND', 'message': 'This route not found'}) — fallback: {}
+2025-10-20 19:09:45 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] Falha ao obter saldos: (404, {'code': 'API|ROUTE_NOT_FOUND', 'message': 'This route not found'}) — fallback: {}
+2025-10-20 19:09:45 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:09:52 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:09:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:06 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:14 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:21 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:28 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:42 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:49 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:10:56 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:03 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:08 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:15 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:22 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:29 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:36 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:43 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:51 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:11:58 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:05 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:12 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:19 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:26 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:34 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:41 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:48 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:12:55 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:02 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:09 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:16 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:24 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:31 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:38 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:45 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:52 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:13:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:14:06 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:14:13 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:14:20 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:14:25 [INFO] ARBIT: Finalizado.
+2025-10-20 19:14:28 [INFO] ARBIT: ====================================================
+2025-10-20 19:14:28 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 19:14:28 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 19:14:28 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 19:14:28 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 19:14:28 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 19:14:28 [INFO] ARBIT: ====================================================
+2025-10-20 19:14:39 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 19:14:46 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] listar contas falhou: HTTP 403 - {'code': 'API|FORBIDDEN', 'message': 'You need to be authenticated'} — fallback: {}
+2025-10-20 19:14:46 [ERROR] monitor: [loop] erro: 'Adapters' object has no attribute 'enforce_minima'
+2025-10-20 19:14:50 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] listar contas falhou: HTTP 403 - {'code': 'API|FORBIDDEN', 'message': 'You need to be authenticated'} — fallback: {}
+2025-10-20 19:14:53 [WARNING] exchanges: [mercadobitcoin v4] get_balances falhou: [MB v4] listar contas falhou: HTTP 403 - {'code': 'API|FORBIDDEN', 'message': 'You need to be authenticated'} — fallback: {}
+2025-10-20 19:14:53 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 19:14:57 [INFO] ARBIT: Finalizado.
+2025-10-20 20:07:15 [INFO] ARBIT: ====================================================
+2025-10-20 20:07:15 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 20:07:15 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 20:07:15 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 20:07:15 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 20:07:15 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 20:07:15 [INFO] ARBIT: ====================================================
+2025-10-20 20:07:29 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 20:07:35 [ERROR] monitor: [loop] erro: can't multiply sequence by non-int of type 'float'
+2025-10-20 20:07:39 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:07:44 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:07:51 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:07:57 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:03 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:08 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:13 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:19 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:25 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:31 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:37 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:43 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:49 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:08:56 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:02 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:08 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:14 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:20 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:26 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:32 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:38 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:44 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:50 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:09:56 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:10:02 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:10:06 [INFO] ARBIT: Finalizado.
+2025-10-20 20:24:35 [INFO] ARBIT: ====================================================
+2025-10-20 20:24:35 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 20:24:35 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 20:24:35 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 20:24:35 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 20:24:35 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 20:24:35 [INFO] ARBIT: ====================================================
+2025-10-20 20:24:47 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 20:24:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:05 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:11 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:17 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:23 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:29 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:41 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:47 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:53 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:25:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:05 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:11 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:17 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:23 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:29 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:42 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:48 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:26:54 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:00 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:06 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:12 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:18 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:24 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:30 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:41 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:47 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:53 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:27:58 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:04 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:10 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:17 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:23 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:29 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:41 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:47 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:53 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:28:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:05 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:11 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:17 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:23 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:29 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:35 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:41 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:47 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:53 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:29:59 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:05 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:11 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:16 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:22 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:28 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:34 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:30:38 [INFO] ARBIT: Finalizado.
+2025-10-20 20:30:43 [INFO] ARBIT: ====================================================
+2025-10-20 20:30:43 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 20:30:43 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 20:30:43 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 20:30:43 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 20:30:43 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 20:30:43 [INFO] ARBIT: ====================================================
+2025-10-20 20:30:54 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 20:30:54 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 20:30:54 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 20:30:59 [INFO] monitor: [BTC/USDT] ref=110708.405000 -> buy_tgt=99637.564500 | sell_tgt=121779.245500
+2025-10-20 20:30:59 [INFO] router: [BTC/USDT] reprice: buy_tgt=99637.564500 | sell_tgt=121779.245500
+2025-10-20 20:31:01 [INFO] router: [BTC/USDT] novadax BUY BTC/BRL bloqueado por mínimos: amount<5.63e-05 (amount_calc=0.0005018187693658449 @ 99637.56450000001 USDT)
+2025-10-20 20:31:02 [INFO] router: [BTC/USDT] gate SELL BTC/USDT bloqueado por mínimos: amount<1e-06 (amount_calc=0.0004105789931175095 @ 121779.2455 USDT)
+2025-10-20 20:31:03 [INFO] monitor: [ETH/USDT] ref=3987.245000 -> buy_tgt=3668.265400 | sell_tgt=4306.224600
+2025-10-20 20:31:03 [INFO] router: [ETH/USDT] reprice: buy_tgt=3668.265400 | sell_tgt=4306.224600
+2025-10-20 20:31:04 [INFO] router: [ETH/USDT] novadax BUY ETH/BRL bloqueado por mínimos: amount<0.00119931 (amount_calc=0.00021430290855741676 @ 3668.2654 USDT)
+2025-10-20 20:31:06 [INFO] router: [ETH/USDT] gate SELL ETH/USDT bloqueado por mínimos: amount<0.001 (amount_calc=0.0 @ 4306.2246000000005 USDT)
+2025-10-20 20:31:06 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:31:12 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:31:18 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:31:24 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:31:26 [INFO] ARBIT: Finalizado.
+2025-10-20 20:40:26 [INFO] ARBIT: ====================================================
+2025-10-20 20:40:26 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 20:40:26 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 20:40:26 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 20:40:26 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 20:40:26 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 20:40:26 [INFO] ARBIT: ====================================================
+2025-10-20 20:40:38 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 20:40:38 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 20:40:38 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 20:40:43 [INFO] monitor: [BTC/USDT] ref=110623.475000 -> buy_tgt=99561.127500 | sell_tgt=121685.822500
+2025-10-20 20:40:43 [INFO] router: [BTC/USDT] reprice: buy_tgt=99561.127500 | sell_tgt=121685.822500
+2025-10-20 20:40:46 [WARNING] router: [BTC/USDT] novadax BTC/BRL buy create_order falhou: novadax {"code":"A30007","message":"Insufficient balance"}
+2025-10-20 20:40:48 [WARNING] router: [BTC/USDT] gate BTC/USDT sell create_order falhou: gate {"label":"BALANCE_NOT_ENOUGH","message":"Not enough balance"}
+2025-10-20 20:40:48 [INFO] monitor: [ETH/USDT] ref=3979.935000 -> buy_tgt=3661.540200 | sell_tgt=4298.329800
+2025-10-20 20:40:48 [INFO] router: [ETH/USDT] reprice: buy_tgt=3661.540200 | sell_tgt=4298.329800
+2025-10-20 20:40:50 [WARNING] router: [ETH/USDT] novadax ETH/BRL buy create_order falhou: novadax {"code":"A30007","message":"Insufficient balance"}
+2025-10-20 20:40:52 [INFO] router: [ETH/USDT] mexc SELL ETH/USDT bloqueado por mínimos: zero (amount_calc=0.0 @ 4298.3298 USDT)
+2025-10-20 20:40:52 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:40:58 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:41:04 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:41:10 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:41:16 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:41:21 [INFO] ARBIT: Finalizado.
+2025-10-20 20:58:47 [INFO] ARBIT: ====================================================
+2025-10-20 20:58:47 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 20:58:47 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 20:58:47 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 20:58:47 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 20:58:47 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 20:58:47 [INFO] ARBIT: ====================================================
+2025-10-20 20:58:59 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 20:58:59 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 20:58:59 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 20:58:59 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-20 20:58:59 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-20 20:58:59 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-20 20:59:00 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-20 20:59:00 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-20 20:59:05 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 20:59:05 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 20:59:05 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-20 20:59:06 [INFO] monitor: [BTC/USDT] ref=110532.085000 -> buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:06 [INFO] router: [BTC/USDT] reprice: buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:06 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:07 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:07 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99478.87650000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:07 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:08 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:09 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99478.87650000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:09 [WARNING] router: [BTC/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:09 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 20:59:09 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 20:59:10 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:10 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 20:59:11 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 20:59:12 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:12 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:13 [INFO] monitor: [ETH/USDT] ref=3979.135000 -> buy_tgt=3660.804200 | sell_tgt=4297.465800
+2025-10-20 20:59:13 [INFO] router: [ETH/USDT] reprice: buy_tgt=3660.804200 | sell_tgt=4297.465800
+2025-10-20 20:59:13 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.60804200USDT (tem 7.86119945USDT)
+2025-10-20 20:59:13 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.98241260USDT (tem 6.02059930USDT)
+2025-10-20 20:59:14 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3660.80420000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:14 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.60804200USDT (tem 7.86119945USDT)
+2025-10-20 20:59:14 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.98241260USDT (tem 6.02059930USDT)
+2025-10-20 20:59:15 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3660.80420000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:15 [WARNING] router: [ETH/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:15 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 20:59:16 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 20:59:17 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:17 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 20:59:17 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 20:59:18 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:18 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:18 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:59:19 [INFO] monitor: [BTC/USDT] ref=110532.085000 -> buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:19 [INFO] router: [BTC/USDT] reprice: buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:19 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:19 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:20 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99478.87650000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:20 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:20 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:21 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99478.87650000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:21 [WARNING] router: [BTC/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:21 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 20:59:22 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 20:59:23 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:23 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 20:59:23 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 20:59:24 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:24 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:25 [INFO] monitor: [ETH/USDT] ref=3979.365000 -> buy_tgt=3661.015800 | sell_tgt=4297.714200
+2025-10-20 20:59:25 [INFO] router: [ETH/USDT] reprice: buy_tgt=3661.015800 | sell_tgt=4297.714200
+2025-10-20 20:59:25 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.61015800USDT (tem 7.86119945USDT)
+2025-10-20 20:59:26 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.98304740USDT (tem 6.02059930USDT)
+2025-10-20 20:59:26 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3661.01580000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:26 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.61015800USDT (tem 7.86119945USDT)
+2025-10-20 20:59:27 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.98304740USDT (tem 6.02059930USDT)
+2025-10-20 20:59:27 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3661.01580000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:27 [WARNING] router: [ETH/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:28 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 20:59:28 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 20:59:29 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:29 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 20:59:30 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 20:59:30 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 20:59:30 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 20:59:30 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 20:59:31 [INFO] monitor: [BTC/USDT] ref=110532.085000 -> buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:31 [INFO] router: [BTC/USDT] reprice: buy_tgt=99478.876500 | sell_tgt=121585.293500
+2025-10-20 20:59:31 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:32 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:32 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99478.87650000USDT (tem 7.32411285USDT)
+2025-10-20 20:59:32 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.47887650USDT (tem 7.86119945USDT)
+2025-10-20 20:59:33 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.94267642USDT (tem 6.02059930USDT)
+2025-10-20 20:59:34 [INFO] ARBIT: Finalizado.
+2025-10-20 21:04:40 [INFO] ARBIT: ====================================================
+2025-10-20 21:04:40 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 21:04:40 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 21:04:40 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 21:04:40 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 21:04:40 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 21:04:40 [INFO] ARBIT: ====================================================
+2025-10-20 21:04:51 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 21:04:51 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 21:04:51 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 21:04:51 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-20 21:04:51 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-20 21:04:51 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-20 21:04:52 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-20 21:04:52 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-20 21:04:57 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:04:57 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:04:57 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-20 21:04:58 [INFO] monitor: [BTC/USDT] ref=110411.895000 -> buy_tgt=99370.705500 | sell_tgt=121453.084500
+2025-10-20 21:04:58 [INFO] router: [BTC/USDT] reprice: buy_tgt=99370.705500 | sell_tgt=121453.084500
+2025-10-20 21:04:58 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.37070550USDT (tem 7.86119945USDT)
+2025-10-20 21:04:58 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.93077760USDT (tem 6.02059930USDT)
+2025-10-20 21:04:59 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99370.70550000USDT (tem 7.32411285USDT)
+2025-10-20 21:04:59 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.37070550USDT (tem 7.86119945USDT)
+2025-10-20 21:04:59 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.93077760USDT (tem 6.02059930USDT)
+2025-10-20 21:05:00 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99370.70550000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:00 [WARNING] router: [BTC/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:00 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:05:01 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:05:02 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:02 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:05:02 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:05:03 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:03 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:04 [INFO] monitor: [ETH/USDT] ref=3971.585000 -> buy_tgt=3653.858200 | sell_tgt=4289.311800
+2025-10-20 21:05:04 [INFO] router: [ETH/USDT] reprice: buy_tgt=3653.858200 | sell_tgt=4289.311800
+2025-10-20 21:05:04 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.53858200USDT (tem 7.86119945USDT)
+2025-10-20 21:05:05 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.96157460USDT (tem 6.02059930USDT)
+2025-10-20 21:05:05 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3653.85820000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:06 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.53858200USDT (tem 7.86119945USDT)
+2025-10-20 21:05:06 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.96157460USDT (tem 6.02059930USDT)
+2025-10-20 21:05:07 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3653.85820000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:07 [WARNING] router: [ETH/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:07 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 21:05:08 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:05:08 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:09 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 21:05:09 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:05:10 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:10 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:10 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 21:05:11 [INFO] monitor: [BTC/USDT] ref=110408.565000 -> buy_tgt=99367.708500 | sell_tgt=121449.421500
+2025-10-20 21:05:11 [INFO] router: [BTC/USDT] reprice: buy_tgt=99367.708500 | sell_tgt=121449.421500
+2025-10-20 21:05:11 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.36770850USDT (tem 7.86119945USDT)
+2025-10-20 21:05:11 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.93044794USDT (tem 6.02059930USDT)
+2025-10-20 21:05:12 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99367.70850000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:12 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.36770850USDT (tem 7.86119945USDT)
+2025-10-20 21:05:12 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.93044794USDT (tem 6.02059930USDT)
+2025-10-20 21:05:13 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99367.70850000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:13 [WARNING] router: [BTC/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:13 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:05:14 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:05:15 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:15 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:05:15 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:05:16 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:05:16 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:05:17 [INFO] monitor: [ETH/USDT] ref=3972.145000 -> buy_tgt=3654.373400 | sell_tgt=4289.916600
+2025-10-20 21:05:17 [INFO] router: [ETH/USDT] reprice: buy_tgt=3654.373400 | sell_tgt=4289.916600
+2025-10-20 21:05:17 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.54373400USDT (tem 7.86119945USDT)
+2025-10-20 21:05:18 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.96312020USDT (tem 6.02059930USDT)
+2025-10-20 21:05:18 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3654.37340000USDT (tem 7.32411285USDT)
+2025-10-20 21:05:18 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.54373400USDT (tem 7.86119945USDT)
+2025-10-20 21:05:19 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.96312020USDT (tem 6.02059930USDT)
+2025-10-20 21:05:20 [INFO] ARBIT: Finalizado.
+2025-10-20 21:15:24 [INFO] ARBIT: ====================================================
+2025-10-20 21:15:24 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 21:15:24 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 21:15:24 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 21:15:24 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 21:15:24 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 21:15:24 [INFO] ARBIT: ====================================================
+2025-10-20 21:15:35 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 21:15:35 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 21:15:35 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 21:15:35 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-20 21:15:36 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-20 21:15:36 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-20 21:15:36 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-20 21:15:36 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-20 21:15:41 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:15:41 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:15:41 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-20 21:15:42 [INFO] monitor: [BTC/USDT] ref=110256.925000 -> buy_tgt=99231.232500 | sell_tgt=121282.617500
+2025-10-20 21:15:42 [INFO] router: [BTC/USDT] reprice: buy_tgt=99231.232500 | sell_tgt=121282.617500
+2025-10-20 21:15:42 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.23123250USDT (tem 7.86119945USDT)
+2025-10-20 21:15:43 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.91543558USDT (tem 6.02059930USDT)
+2025-10-20 21:15:43 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99231.23250000USDT (tem 7.32411285USDT)
+2025-10-20 21:15:43 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.23123250USDT (tem 7.86119945USDT)
+2025-10-20 21:15:44 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.91543558USDT (tem 6.02059930USDT)
+2025-10-20 21:15:44 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99231.23250000USDT (tem 7.32411285USDT)
+2025-10-20 21:15:44 [WARNING] router: [BTC/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 21:15:45 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:15:45 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:15:46 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:15:46 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00100000 (tem 0.00004161)
+2025-10-20 21:15:47 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:15:47 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:15:47 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:15:48 [INFO] monitor: [ETH/USDT] ref=3968.805000 -> buy_tgt=3651.300600 | sell_tgt=4286.309400
+2025-10-20 21:15:48 [INFO] router: [ETH/USDT] reprice: buy_tgt=3651.300600 | sell_tgt=4286.309400
+2025-10-20 21:15:49 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.51300600USDT (tem 7.86119945USDT)
+2025-10-20 21:15:49 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.95390180USDT (tem 6.02059930USDT)
+2025-10-20 21:15:49 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3651.30060000USDT (tem 7.32411285USDT)
+2025-10-20 21:15:50 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<36.51300600USDT (tem 7.86119945USDT)
+2025-10-20 21:15:50 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.95390180USDT (tem 6.02059930USDT)
+2025-10-20 21:15:51 [INFO] router: [ETH/USDT] BUY skip mexc (ETH/USDT) por saldo: saldo_quote<3651.30060000USDT (tem 7.32411285USDT)
+2025-10-20 21:15:51 [WARNING] router: [ETH/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-20 21:15:51 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 21:15:52 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:15:52 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:15:53 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.01000000 (tem 0.00000000)
+2025-10-20 21:15:53 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:15:54 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:15:54 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:15:54 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 21:15:55 [INFO] monitor: [BTC/USDT] ref=110270.450000 -> buy_tgt=99243.405000 | sell_tgt=121297.495000
+2025-10-20 21:15:55 [INFO] router: [BTC/USDT] reprice: buy_tgt=99243.405000 | sell_tgt=121297.495000
+2025-10-20 21:15:55 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.24340500USDT (tem 7.86119945USDT)
+2025-10-20 21:15:55 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.91677455USDT (tem 6.02059930USDT)
+2025-10-20 21:15:56 [INFO] router: [BTC/USDT] BUY skip mexc (BTC/USDT) por saldo: saldo_quote<99243.40500000USDT (tem 7.32411285USDT)
+2025-10-20 21:15:56 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99.24340500USDT (tem 7.86119945USDT)
+2025-10-20 21:15:56 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.91677455USDT (tem 6.02059930USDT)
+2025-10-20 21:15:57 [INFO] ARBIT: Finalizado.
+2025-10-20 21:39:37 [INFO] ARBIT: ====================================================
+2025-10-20 21:39:37 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-20 21:39:37 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-20 21:39:37 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-20 21:39:37 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-20 21:39:37 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-20 21:39:37 [INFO] ARBIT: ====================================================
+2025-10-20 21:39:48 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-20 21:39:48 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-20 21:39:48 [INFO] monitor: MainMonitor iniciado.
+2025-10-20 21:39:48 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-20 21:39:48 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-20 21:39:48 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-20 21:39:49 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-20 21:39:49 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-20 21:39:55 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:39:55 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-20 21:39:55 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-20 21:39:56 [INFO] monitor: [BTC/USDT] ref=110379.995000 -> buy_tgt=99341.995500 | sell_tgt=121417.994500
+2025-10-20 21:39:56 [INFO] router: [BTC/USDT] reprice: buy_tgt=99341.995500 | sell_tgt=121417.994500
+2025-10-20 21:39:56 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99341.99550000USDT (tem 7.86119945USDT)
+2025-10-20 21:39:56 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.92761951USDT (tem 6.02059930USDT)
+2025-10-20 21:40:00 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-20 21:40:00 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161)
+2025-10-20 21:40:01 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:40:01 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000)
+2025-10-20 21:40:01 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161)
+2025-10-20 21:40:02 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:40:03 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000)
+2025-10-20 21:40:03 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:40:04 [INFO] monitor: [ETH/USDT] ref=3982.835000 -> buy_tgt=3664.208200 | sell_tgt=4301.461800
+2025-10-20 21:40:04 [INFO] router: [ETH/USDT] reprice: buy_tgt=3664.208200 | sell_tgt=4301.461800
+2025-10-20 21:40:04 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<3664.20820000USDT (tem 7.86119945USDT)
+2025-10-20 21:40:04 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.99262460USDT (tem 6.02059930USDT)
+2025-10-20 21:40:08 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-20 21:40:08 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:40:09 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:40:09 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000)
+2025-10-20 21:40:09 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<1.00000000 (tem 0.00000000)
+2025-10-20 21:40:10 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000)
+2025-10-20 21:40:10 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000)
+2025-10-20 21:40:10 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:40:10 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-20 21:40:11 [INFO] monitor: [BTC/USDT] ref=110404.165000 -> buy_tgt=99363.748500 | sell_tgt=121444.581500
+2025-10-20 21:40:11 [INFO] router: [BTC/USDT] reprice: buy_tgt=99363.748500 | sell_tgt=121444.581500
+2025-10-20 21:40:11 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<99363.74850000USDT (tem 7.86119945USDT)
+2025-10-20 21:40:12 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.93001234USDT (tem 6.02059930USDT)
+2025-10-20 21:40:15 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-20 21:40:16 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161)
+2025-10-20 21:40:16 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:40:17 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000)
+2025-10-20 21:40:17 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161)
+2025-10-20 21:40:18 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297)
+2025-10-20 21:40:19 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000)
+2025-10-20 21:40:19 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-20 21:40:20 [INFO] monitor: [ETH/USDT] ref=3983.315000 -> buy_tgt=3664.649800 | sell_tgt=4301.980200
+2025-10-20 21:40:20 [INFO] router: [ETH/USDT] reprice: buy_tgt=3664.649800 | sell_tgt=4301.980200
+2025-10-20 21:40:20 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<3664.64980000USDT (tem 7.86119945USDT)
+2025-10-20 21:40:20 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.99394940USDT (tem 6.02059930USDT)
+2025-10-20 21:40:23 [INFO] ARBIT: Finalizado.
+2025-10-21 01:08:09 [INFO] ARBIT: ====================================================
+2025-10-21 01:08:09 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 01:08:09 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 01:08:09 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-21 01:08:09 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 01:08:09 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 01:08:09 [INFO] ARBIT: ====================================================
+2025-10-21 01:08:28 [WARNING] exchanges: [mexc] load_markets falhou, tentando sync + retry: mexc GET https://api.mexc.com/api/v3/capital/config/getall?timestamp=1761019688322&recvWindow=60000&signature=74bf2096cd567adec76d94fb33d8a52bd9b85a26e889ddb9365c9430e7d8532f
+2025-10-21 01:08:35 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-21 01:08:35 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-21 01:08:35 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 01:08:35 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 01:08:35 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-21 01:08:35 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-21 01:08:37 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-21 01:08:37 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-21 01:08:42 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 01:08:42 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 01:08:42 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 01:08:43 [INFO] monitor: [BTC/USDT] ref=108344.620000 -> buy_tgt=97510.158000 | sell_tgt=119179.082000
+2025-10-21 01:08:43 [INFO] router: [BTC/USDT] reprice: buy_tgt=97510.158000 | sell_tgt=119179.082000
+2025-10-21 01:08:43 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<97510.15800000USDT (tem 7.86119945USDT) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:08:43 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.72611738USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:08:47 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:08:47 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:08:48 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:08:48 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:08:49 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:08:49 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:08:50 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:08:50 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:08:51 [INFO] monitor: [ETH/USDT] ref=3878.010000 -> buy_tgt=3567.769200 | sell_tgt=4188.250800
+2025-10-21 01:08:51 [INFO] router: [ETH/USDT] reprice: buy_tgt=3567.769200 | sell_tgt=4188.250800
+2025-10-21 01:08:51 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<3567.76920000USDT (tem 7.86119945USDT) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:08:51 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.70330760USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:08:55 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:08:56 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<1.00000000 (tem 0.00000000) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:08:56 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:08:57 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 01:08:57 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<1.00000000 (tem 0.00000000) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:08:58 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:08:58 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 01:08:58 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:08:58 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 01:08:59 [INFO] monitor: [BTC/USDT] ref=108326.005000 -> buy_tgt=97493.404500 | sell_tgt=119158.605500
+2025-10-21 01:08:59 [INFO] router: [BTC/USDT] reprice: buy_tgt=97493.404500 | sell_tgt=119158.605500
+2025-10-21 01:09:00 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<97493.40450000USDT (tem 7.86119945USDT) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:09:00 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.72427450USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:09:04 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:09:04 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:09:05 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:09:05 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:09:05 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<1.00000000 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:09:06 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:09:07 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:09:07 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:09:08 [INFO] monitor: [ETH/USDT] ref=3876.395000 -> buy_tgt=3566.283400 | sell_tgt=4186.506600
+2025-10-21 01:09:08 [INFO] router: [ETH/USDT] reprice: buy_tgt=3566.283400 | sell_tgt=4186.506600
+2025-10-21 01:09:09 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<3566.28340000USDT (tem 7.86119945USDT) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:09:09 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.69885020USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:09:13 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:09:13 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<1.00000000 (tem 0.00000000) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:09:13 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:09:14 [INFO] ARBIT: Finalizado.
+2025-10-21 01:37:22 [INFO] ARBIT: ====================================================
+2025-10-21 01:37:22 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 01:37:22 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 01:37:22 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-21 01:37:22 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 01:37:22 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 01:37:22 [INFO] ARBIT: ====================================================
+2025-10-21 01:37:33 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-21 01:37:33 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-21 01:37:33 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 01:37:33 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 01:37:34 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-21 01:37:34 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-21 01:37:34 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-21 01:37:34 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-21 01:37:40 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 01:37:40 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 01:37:40 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 01:37:41 [INFO] monitor: [BTC/USDT] ref=107997.155000 -> buy_tgt=97197.439500 | sell_tgt=118796.870500
+2025-10-21 01:37:41 [INFO] router: [BTC/USDT] reprice: buy_tgt=97197.439500 | sell_tgt=118796.870500
+2025-10-21 01:37:41 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<27.36107922USDT (tem 7.86119945USDT) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:37:41 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.69171835USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:37:45 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:37:45 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00022520 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:37:46 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:37:47 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:37:47 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00022520 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:37:48 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:37:48 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:37:48 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:37:49 [INFO] monitor: [ETH/USDT] ref=3859.375000 -> buy_tgt=3550.625000 | sell_tgt=4168.125000
+2025-10-21 01:37:49 [INFO] router: [ETH/USDT] reprice: buy_tgt=3550.625000 | sell_tgt=4168.125000
+2025-10-21 01:37:49 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<25.54980041USDT (tem 7.86119945USDT) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:37:50 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.65187500USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:37:54 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:37:54 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.00719586 (tem 0.00000000) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:37:54 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:37:55 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 01:37:56 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.00719586 (tem 0.00000000) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:37:56 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:37:58 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 01:37:58 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:37:58 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 01:37:58 [INFO] monitor: [BTC/USDT] ref=107964.725000 -> buy_tgt=97168.252500 | sell_tgt=118761.197500
+2025-10-21 01:37:58 [INFO] router: [BTC/USDT] reprice: buy_tgt=97168.252500 | sell_tgt=118761.197500
+2025-10-21 01:37:59 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<27.35286308USDT (tem 7.86119945USDT) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:37:59 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.68850778USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:38:04 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 01:38:04 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00022520 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:38:05 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:38:06 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:38:06 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00022520 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=25.0
+2025-10-21 01:38:06 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 01:38:07 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 01:38:07 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 01:38:08 [INFO] monitor: [ETH/USDT] ref=3858.725000 -> buy_tgt=3550.027000 | sell_tgt=4167.423000
+2025-10-21 01:38:08 [INFO] router: [ETH/USDT] reprice: buy_tgt=3550.027000 | sell_tgt=4167.423000
+2025-10-21 01:38:08 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<25.54549729USDT (tem 7.86119945USDT) | mins: qty>=0.00119931 notional>=25.0
+2025-10-21 01:38:09 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.65008100USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 01:38:11 [INFO] ARBIT: Finalizado.
+2025-10-21 08:09:42 [INFO] ARBIT: ====================================================
+2025-10-21 08:09:42 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 08:09:42 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 08:09:42 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT
+2025-10-21 08:09:42 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 08:09:42 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 08:09:42 [INFO] ARBIT: ====================================================
+2025-10-21 08:09:55 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-21 08:09:55 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT
+2025-10-21 08:09:55 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 08:09:55 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 08:09:55 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-21 08:09:55 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-21 08:09:55 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-21 08:09:55 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-21 08:10:01 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 08:10:01 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 08:10:01 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 08:10:02 [INFO] monitor: [BTC/USDT] ref=108169.050000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:10:02 [INFO] router: [BTC/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:10:03 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.70874090USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 08:10:05 [INFO] router: [BTC/USDT] [novadax] BUY BTC/BRL qty=5.63e-05 price=526886.0 (oid=1430271929798021120)
+2025-10-21 08:10:06 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00005630 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=4.47
+2025-10-21 08:10:07 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 08:10:08 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 08:10:08 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:10:09 [INFO] monitor: [ETH/USDT] ref=3870.805000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:10:09 [INFO] router: [ETH/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:10:09 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<8.07687355USDT (tem 2.56411341USDT) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:10:10 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.45548000USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 08:10:13 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 08:10:14 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.00119931 (tem 0.00000000) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:10:15 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 08:10:16 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 08:10:16 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:10:16 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 08:10:17 [INFO] monitor: [BTC/USDT] ref=108246.050000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:10:17 [INFO] router: [BTC/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:10:17 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<5.30037380USDT (tem 2.56411341USDT) | mins: qty>=5.63e-05 notional>=4.47
+2025-10-21 08:10:18 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<10.71694800USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 08:10:22 [WARNING] router: [BTC/USDT] mexc BTC/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 08:10:23 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00005630 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=4.47
+2025-10-21 08:10:24 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=10.0
+2025-10-21 08:10:24 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 08:10:24 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:10:25 [INFO] monitor: [ETH/USDT] ref=3872.395000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:10:25 [INFO] router: [ETH/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:10:26 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<8.07742866USDT (tem 7.86119945USDT) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:10:26 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.45542600USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=10.0
+2025-10-21 08:10:31 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10007,"msg":"symbol not support api"}
+2025-10-21 08:10:31 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.00119931 (tem 0.00000000) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:10:32 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=10.0
+2025-10-21 08:10:33 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 08:10:33 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:10:34 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 08:10:34 [INFO] monitor: [BTC/USDT] ref=108251.050000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:10:34 [INFO] router: [BTC/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:10:36 [INFO] ARBIT: Finalizado.
+2025-10-21 08:57:01 [INFO] ARBIT: ====================================================
+2025-10-21 08:57:01 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 08:57:01 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 08:57:01 [INFO] ARBIT: PAIRS=BTC/USDT,ETH/USDT,SOL/USDT
+2025-10-21 08:57:01 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 08:57:01 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 08:57:01 [INFO] ARBIT: ====================================================
+2025-10-21 08:57:12 [INFO] monitor: Exchanges habilitadas: novadax,gate,mexc
+2025-10-21 08:57:12 [INFO] monitor: Pares monitorados: BTC/USDT, ETH/USDT, SOL/USDT
+2025-10-21 08:57:12 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 08:57:12 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 08:57:12 [INFO] monitor: [novadax] BTC/USDT (BTC/BRL) | BASE BTC=0.0000416088 | QUOTE BRL=44.0227168965
+2025-10-21 08:57:12 [INFO] monitor: [novadax] ETH/USDT (ETH/BRL) | BASE ETH=0.0000000000 | QUOTE BRL=44.0227168965
+2025-10-21 08:57:12 [INFO] monitor: [novadax] SOL/USDT (SOL/USDT) | BASE SOL=0.0000000000 | QUOTE USDT=0.0000000000
+2025-10-21 08:57:12 [INFO] monitor: [gate] BTC/USDT (BTC/USDT) | BASE BTC=0.0000329670 | QUOTE USDT=6.0205993000
+2025-10-21 08:57:12 [INFO] monitor: [gate] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-21 08:57:12 [INFO] monitor: [gate] SOL/USDT (SOL/USDT) | BASE SOL=0.0000000000 | QUOTE USDT=6.0205993000
+2025-10-21 08:57:18 [INFO] monitor: [mexc] BTC/USDT (BTC/USDT) | BASE BTC=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 08:57:18 [INFO] monitor: [mexc] ETH/USDT (ETH/USDT) | BASE ETH=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 08:57:18 [INFO] monitor: [mexc] SOL/USDT (SOL/USDT) | BASE SOL=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 08:57:18 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 08:57:19 [INFO] monitor: [BTC/USDT] ref=108578.050000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:57:19 [INFO] router: [BTC/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:57:20 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<8.79482610USDT (tem 6.02059930USDT) | mins: qty>=9e-05 notional>=2.0
+2025-10-21 08:57:22 [INFO] router: [BTC/USDT] [novadax] BUY BTC/BRL qty=5.63e-05 price=528537.0 (oid=1430283827297837056)
+2025-10-21 08:57:22 [INFO] router: [BTC/USDT] SELL skip novadax (BTC/BRL) por saldo: saldo_base<0.00005630 (tem 0.00004161) | mins: qty>=5.63e-05 notional>=4.47
+2025-10-21 08:57:23 [INFO] router: [BTC/USDT] SELL skip gate (BTC/USDT) por saldo: saldo_base<0.00009000 (tem 0.00003297) | mins: qty>=9e-05 notional>=2.0
+2025-10-21 08:57:24 [INFO] router: [BTC/USDT] SELL skip mexc (BTC/USDT) por saldo: saldo_base<0.00000900 (tem 0.00000000) | mins: qty>=5e-06 notional>=1.0
+2025-10-21 08:57:24 [WARNING] router: [BTC/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:57:25 [INFO] monitor: [ETH/USDT] ref=3891.955000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:57:25 [INFO] router: [ETH/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:57:26 [INFO] router: [ETH/USDT] BUY skip novadax (ETH/BRL) por saldo: saldo_quote<8.11391553USDT (tem 2.54751496USDT) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:57:27 [INFO] router: [ETH/USDT] BUY skip gate (ETH/USDT) por saldo: saldo_quote<10.50864300USDT (tem 6.02059930USDT) | mins: qty>=0.003 notional>=2.0
+2025-10-21 08:57:31 [WARNING] router: [ETH/USDT] mexc ETH/USDT buy create_order falhou: mexc {"code":10004,"msg":"symbol not support api"}
+2025-10-21 08:57:31 [INFO] router: [ETH/USDT] SELL skip novadax (ETH/BRL) por saldo: saldo_base<0.00119931 (tem 0.00000000) | mins: qty>=0.00119931 notional>=4.47
+2025-10-21 08:57:32 [INFO] router: [ETH/USDT] SELL skip gate (ETH/USDT) por saldo: saldo_base<0.00300000 (tem 0.00000000) | mins: qty>=0.003 notional>=2.0
+2025-10-21 08:57:34 [INFO] router: [ETH/USDT] SELL skip mexc (ETH/USDT) por saldo: saldo_base<0.00030000 (tem 0.00000000) | mins: qty>=0.0001 notional>=1.0
+2025-10-21 08:57:34 [WARNING] router: [ETH/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:57:35 [INFO] monitor: [SOL/USDT] ref=186.315000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:57:35 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:57:35 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/USDT) por saldo: saldo_quote<6.39160380USDT (tem 0.00000000USDT) | mins: qty>=0.019 notional>=5.0
+2025-10-21 08:57:39 [INFO] router: [SOL/USDT] [gate] BUY SOL/USDT qty=0.03 price=167.67000000000002 (oid=942547659562)
+2025-10-21 08:57:39 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/USDT) por saldo: saldo_base<0.03800000 (tem 0.00000000) | mins: qty>=0.019 notional>=5.0
+2025-10-21 08:57:40 [INFO] router: [SOL/USDT] SELL skip gate (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00000000) | mins: qty>=0.01 notional>=2.0
+2025-10-21 08:57:42 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00000000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 08:57:42 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 08:57:42 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 08:57:43 [INFO] monitor: [BTC/USDT] ref=108581.950000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 08:57:43 [INFO] router: [BTC/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 08:57:44 [INFO] router: [BTC/USDT] BUY skip novadax (BTC/BRL) por saldo: saldo_quote<5.31368319USDT (tem 2.54751496USDT) | mins: qty>=5.63e-05 notional>=4.47
+2025-10-21 08:57:44 [INFO] router: [BTC/USDT] BUY skip gate (BTC/USDT) por saldo: saldo_quote<8.79514200USDT (tem 0.99049930USDT) | mins: qty>=9e-05 notional>=2.0
+2025-10-21 08:57:45 [INFO] ARBIT: Finalizado.
+2025-10-21 09:07:15 [INFO] ARBIT: ====================================================
+2025-10-21 09:07:15 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 09:07:15 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 09:07:15 [INFO] ARBIT: PAIRS=SOL/USDT
+2025-10-21 09:07:15 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 09:07:15 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 09:07:15 [INFO] ARBIT: ====================================================
+2025-10-21 09:07:24 [INFO] monitor: Exchanges habilitadas: novadax,mexc
+2025-10-21 09:07:24 [INFO] monitor: Pares monitorados: SOL/USDT
+2025-10-21 09:07:24 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 09:07:24 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 09:07:24 [INFO] monitor: [novadax] SOL/USDT (SOL/USDT) | BASE SOL=0.0000000000 | QUOTE USDT=0.0000000000
+2025-10-21 09:07:29 [INFO] monitor: [mexc] SOL/USDT (SOL/USDT) | BASE SOL=0.0000000000 | QUOTE USDT=7.3241128459
+2025-10-21 09:07:29 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 09:07:30 [INFO] monitor: [SOL/USDT] ref=186.292500 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 09:07:30 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 09:07:31 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/USDT) por saldo: saldo_quote<6.39126180USDT (tem 0.00000000USDT) | mins: qty>=0.019 notional>=5.0
+2025-10-21 09:07:35 [INFO] router: [SOL/USDT] [mexc] BUY SOL/USDT qty=0.04 price=167.70600000000002 (oid=C02__609290668010905604068)
+2025-10-21 09:07:36 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/USDT) por saldo: saldo_base<0.03800000 (tem 0.00000000) | mins: qty>=0.019 notional>=5.0
+2025-10-21 09:07:36 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00000000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 09:07:36 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 09:07:37 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 09:07:38 [INFO] monitor: [SOL/USDT] ref=186.307500 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 09:07:38 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.1000 sell=0.1000
+2025-10-21 09:07:38 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/USDT) por saldo: saldo_quote<6.39126180USDT (tem 0.00000000USDT) | mins: qty>=0.019 notional>=5.0
+2025-10-21 09:07:39 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.67760000USDT (tem 0.61235865USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 09:07:39 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 09:07:39 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/USDT) por saldo: saldo_base<0.03800000 (tem 0.00000000) | mins: qty>=0.019 notional>=5.0
+2025-10-21 09:07:40 [INFO] ARBIT: Finalizado.
+2025-10-21 09:57:24 [INFO] ARBIT: ====================================================
+2025-10-21 09:57:24 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 09:57:24 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 09:57:24 [INFO] ARBIT: PAIRS=SOL/USDT
+2025-10-21 09:57:24 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 09:57:24 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 09:57:24 [INFO] ARBIT: ====================================================
+2025-10-21 09:57:36 [INFO] monitor: Exchanges habilitadas: novadax,mexc
+2025-10-21 09:57:36 [INFO] monitor: Pares monitorados: SOL/USDT
+2025-10-21 09:57:36 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 09:57:36 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 09:57:36 [INFO] monitor: [novadax] SOL/USDT (SOL/BRL) | BASE SOL=0.0278320000 | QUOTE BRL=39.5898177192
+2025-10-21 09:57:42 [INFO] monitor: [mexc] SOL/USDT (SOL/USDT) | BASE SOL=0.0140000000 | QUOTE USDT=8.3085847397
+2025-10-21 09:57:42 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 09:57:43 [INFO] monitor: [SOL/USDT] ref=183.531339 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 09:57:43 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 09:57:46 [WARNING] router: [SOL/USDT] novadax SOL/BRL buy create_order falhou: 'str' object has no attribute 'UPPER'
+2025-10-21 09:57:46 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 09:57:50 [WARNING] router: [SOL/USDT] mexc SOL/USDT sell create_order falhou: 'str' object has no attribute 'UPPER'
+2025-10-21 09:57:50 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 09:57:51 [INFO] monitor: [SOL/USDT] ref=183.516339 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 09:57:51 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 09:57:52 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.59069829USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 09:57:55 [WARNING] router: [SOL/USDT] mexc SOL/USDT buy create_order falhou: 'str' object has no attribute 'UPPER'
+2025-10-21 09:57:56 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 09:57:57 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00400000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 09:57:57 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 09:57:57 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 09:57:57 [INFO] monitor: [SOL/USDT] ref=183.488348 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 09:57:57 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 09:57:58 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.59069829USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 09:57:59 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.79491200USDT (tem 1.12539494USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 09:57:59 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 09:57:59 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 09:58:00 [INFO] ARBIT: Finalizado.
+2025-10-21 10:36:43 [INFO] ARBIT: ====================================================
+2025-10-21 10:36:43 [INFO] ARBIT: ARBIT - Inicializando
+2025-10-21 10:36:43 [INFO] ARBIT: MODE=REAL  REF=MEDIAN  USDT_BRL_RATE=5.6
+2025-10-21 10:36:43 [INFO] ARBIT: PAIRS=SOL/USDT
+2025-10-21 10:36:43 [INFO] ARBIT: LOOP_INTERVAL_MS=1200  PRINT_EVERY_SEC=5
+2025-10-21 10:36:43 [INFO] ARBIT: HEDGE_ON_FILL=False
+2025-10-21 10:36:43 [INFO] ARBIT: ====================================================
+2025-10-21 10:37:02 [WARNING] exchanges: [mexc] load_markets falhou, tentando sync + retry: mexc GET https://api.mexc.com/api/v3/capital/config/getall?timestamp=1761053802162&recvWindow=60000&signature=f7d34483765804385d6a4499381e10d9553b263b9d9027eff2295c8cdb15ba33
+2025-10-21 10:37:12 [INFO] monitor: Exchanges habilitadas: novadax,mexc
+2025-10-21 10:37:12 [INFO] monitor: Pares monitorados: SOL/USDT
+2025-10-21 10:37:12 [INFO] monitor: MainMonitor iniciado.
+2025-10-21 10:37:12 [INFO] monitor: === Saldo inicial por exchange/par (BASE | QUOTE) ===
+2025-10-21 10:37:12 [INFO] monitor: [novadax] SOL/USDT (SOL/BRL) | BASE SOL=0.0278320000 | QUOTE BRL=2.6538177192
+2025-10-21 10:37:18 [INFO] monitor: [mexc] SOL/USDT (SOL/USDT) | BASE SOL=0.0040000000 | QUOTE USDT=1.1253949397
+2025-10-21 10:37:18 [INFO] monitor: === Fim do relatório de saldos ===
+2025-10-21 10:37:19 [INFO] monitor: [SOL/USDT] ref=182.835000 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 10:37:19 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 10:37:19 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.57239314USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:20 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.78598400USDT (tem 1.12539494USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:20 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:21 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:22 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00400000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:22 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:22 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 10:37:23 [INFO] monitor: [SOL/USDT] ref=182.904241 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 10:37:23 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 10:37:24 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.57840583USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:25 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.78713600USDT (tem 1.12539494USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:25 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:25 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:26 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00400000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:26 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:27 [INFO] monitor: [SOL/USDT] ref=182.939241 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 10:37:27 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 10:37:28 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.58206686USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:28 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.78828800USDT (tem 1.12539494USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:28 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:29 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:30 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00400000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:30 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:30 [INFO] monitor: gross≈0.0000 USDT | health: veja WARN acima se houver falhas
+2025-10-21 10:37:31 [INFO] monitor: [SOL/USDT] ref=182.991116 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 10:37:31 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 10:37:31 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.58206686USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:32 [INFO] router: [SOL/USDT] BUY skip mexc (SOL/USDT) por saldo: saldo_quote<1.78780800USDT (tem 1.12539494USDT) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:32 [WARNING] router: [SOL/USDT] BUY: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:33 [INFO] router: [SOL/USDT] SELL skip novadax (SOL/BRL) por saldo: saldo_base<0.03800000 (tem 0.02783200) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:34 [INFO] router: [SOL/USDT] SELL skip mexc (SOL/USDT) por saldo: saldo_base<0.01000000 (tem 0.00400000) | mins: qty>=0.01 notional>=1.0
+2025-10-21 10:37:34 [WARNING] router: [SOL/USDT] SELL: nenhuma exchange com saldo suficiente.
+2025-10-21 10:37:35 [INFO] monitor: [SOL/USDT] ref=183.062857 (informativo) — ANCHOR_MODE=LOCAL: router usará ask/bid locais ± spread configurado.
+2025-10-21 10:37:35 [INFO] router: [SOL/USDT] reprice(LOCAL): spreads buy=0.0400 sell=0.0400
+2025-10-21 10:37:35 [INFO] router: [SOL/USDT] BUY skip novadax (SOL/BRL) por saldo: saldo_quote<6.58206686USDT (tem 0.47389602USDT) | mins: qty>=0.019 notional>=4.47
+2025-10-21 10:37:36 [INFO] ARBIT: Finalizado.

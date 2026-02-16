@@ -1,0 +1,54 @@
+{
+  "name": "arbit-terminal",
+  "version": "0.1.0",
+  "description": "Terminal ARBIT com Electron + React + API Python",
+  "author": "Datapix Technology",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.datapix.arbit",
+    "productName": "ARBIT Terminal",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../api",
+        "to": "api"
+      },
+      {
+        "from": "../../data",
+        "to": "data"
+      },
+      {
+        "from": "../../logs",
+        "to": "logs"
+      },
+      {
+        "from": "../../.venv313",
+        "to": ".venv313"
+      },
+      {
+        "from": "../../bot.py",
+        "to": "bot.py"
+      },
+      {
+        "from": "../../config",
+        "to": "config"
+      }
+    ],
+    "win": {
+      "target": "portable"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ARBIT 1.0</title>
+
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <!-- CSS local do frontend -->
+    <link rel="stylesheet" href="./styles/main.css" />
+    <link rel="stylesheet" href="./styles/components.css" />
+  </head>
+  <body>
+    <!-- Placeholder para não ficar tudo branco caso React falhe -->
+    <div id="root">Carregando ARBIT...</div>
+
+    <script>
+      console.log("[index.html] script base carregado");
+    </script>
+
+    <!-- Boot da aplicação React -->
+    <script type="module">
+      console.log("[index.html] iniciando boot React...");
+
+      (async () => {
+        try {
+          // Importa React via CDN
+          const ReactMod = await import("https://esm.sh/react@18");
+
+          // Alguns CDNs expõem em default, outros no próprio módulo; garantimos os dois casos
+          const React = ReactMod.default || ReactMod;
+
+          // Deixa React disponível globalmente para os módulos que usam window.React
+          window.React = React;
+
+          // Importa ReactDOM Client
+          const ReactDomClientMod = await import(
+            "https://esm.sh/react-dom@18/client"
+          );
+          const { createRoot } = ReactDomClientMod;
+
+          // (Opcional) expor também se quiser usar em outros scripts
+          window.ReactDOMClient = ReactDomClientMod;
+          window.ReactCreateRoot = createRoot;
+
+          // Importa o componente principal (App.js) local
+          const AppModule = await import("./App.js");
+          const App = AppModule.default;
+
+          const rootEl = document.getElementById("root");
+          if (!rootEl) {
+            throw new Error("Elemento #root não encontrado em index.html");
+          }
+
+          const root = createRoot(rootEl);
+          root.render(React.createElement(App));
+          console.log("[index.html] React renderizado com sucesso");
+        } catch (err) {
+          console.error(
+            "[index.html] ERRO CRÍTICO AO INICIAR A UI:",
+            err
+          );
+
+          const box = document.getElementById("root");
+          if (box) {
+            box.innerHTML =
+              "<pre style='color:#f97373;font-family:monospace;padding:16px;white-space:pre-wrap;background:#020617;border-radius:8px;'>" +
+              "Falha ao iniciar a interface ARBIT.\n" +
+              "Abra o DevTools (F12) e veja o console para detalhes.\n\n" +
+              String(err) +
+              "</pre>";
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

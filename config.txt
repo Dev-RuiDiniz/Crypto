@@ -1,0 +1,201 @@
+[GLOBAL]
+mode = REAL
+usdt_brl_rate = 5.43
+ref_price = MEDIAN
+loop_interval_ms = 1200
+print_every_sec = 5
+panel_enabled = true
+panel_redraw_on_change = true
+panel_force_redraw_sec = false
+panel_header_show_usdt_brl = false
+panel_show_mids = true
+panel_show_balances = true
+api_snapshot_path = data/api_snapshot.json
+sqlite_path = ./data/state.db
+csv_enable = true
+http_timeout_sec = 15
+max_retries = 3
+retry_backoff_ms = 400
+
+[BOOT]
+cancel_open_orders_on_start = true
+cancel_only_configured_pairs = true
+cancel_dry_run = false
+cancel_verify_retries = 2
+cancel_verify_sleep_ms = 800
+cancel_list_details = false
+cancel_list_max = 60
+http_timeout_sec = 15
+max_retries = 3
+retry_backoff_ms = 400
+
+[LOG]
+level = INFO
+file = ./logs/arbit.log
+rotate_mb = 10
+verbose_skips = false
+console_events = true
+events_max = 20
+event_dedup_sec = 90
+
+[RISK]
+max_open_orders_per_pair_per_exchange = 2
+max_gross_exposure_usdt = 500
+kill_switch_drawdown_pct = 25
+cancel_all_on_killswitch = true
+
+[PAIRS]
+list = SOL/USDT,DOGE/USDT
+
+[SPREAD]
+btc/usdt = 0.03
+btc/usdt_buy_pct = 0.03
+btc/usdt_sell_pct = 0.03
+buy_pct = 0.04
+eth/usdt = 0.05
+eth/usdt_buy_pct = 0.05
+eth/usdt_sell_pct = 0.05
+sell_pct = 0.04
+sol/usdt = 0.04
+sol/usdt_buy_pct = 0.04
+sol/usdt_sell_pct = 0.04
+doge/usdt = 0.04
+doge/usdt_buy_pct = 0.04
+doge/usdt_sell_pct = 0.04
+
+[STAKE]
+btc/usdt_mode = FIXO_USDT
+btc/usdt_value = 5.00
+eth/usdt_mode = FIXO_USDT
+eth/usdt_value = 5.00
+sol/usdt_mode = FIXO_USDT
+sol/usdt_value = 5.00
+doge/usdt_mode = FIXO_USDT
+doge/usdt_value = 5.00
+
+[HEDGE]
+hedge_on_fill = false
+hedge_slippage_bps = 10
+
+[EXCHANGES.mercadobitcoin]
+enabled = true
+api_key = 
+api_secret = 
+password = 
+mbv4_bearer_token = 
+mbv4_login = fc3e598b7e1ab0f6a684dd31761213ad696b77a6ab95210aaf5605b63e0c8c04
+mbv4_password = 5806672420b52d27b3d5efdd7918f28f082e5c8f1615263f0f28843cfb6adb1f
+mbv4_orders_base = trading_spot
+mbv4_extra_headers = X-Product: spot;X-Account-Id:{auto};X-User-Locale: pt-BR
+fee_maker = 0.001
+fee_taker = 0.001
+
+[EXCHANGES.novadax]
+enabled = true
+api_key = 214e1d7f-0e7a-48d9-96a0-4fb956e91c23
+api_secret = 0NHs9j6Wl6octV6uwZHr0P5YfHBfIyFV
+password = 
+fee_maker = 0.001
+fee_taker = 0.001
+
+[EXCHANGES.gate]
+enabled = true
+api_key = 16bdf6cfaa71140414cbf37d922b7746
+api_secret = dfcd570bfd1dc2985f033816591765130f5bd372cfebca092ae36129b8ee6a7f
+password = 
+fee_maker = 0.0002
+fee_taker = 0.0005
+
+[EXCHANGES.mexc]
+enabled = true
+api_key = mx0vglIJdqTcb6cfig
+api_secret = b5ea3a3333ab4634bde6c52d600d779e
+password = 
+fee_maker = 0.0002
+fee_taker = 0.0006
+
+[SYMBOLS]
+novadax.btc/usdt.buy = BTC/BRL
+novadax.btc/usdt.sell = BTC/BRL
+gate.btc/usdt.buy = BTC/USDT
+gate.btc/usdt.sell = BTC/USDT
+mexc.btc/usdt.buy = BTC/USDT
+mexc.btc/usdt.sell = BTC/USDT
+mercadobitcoin.btc/usdt.buy = BTC/BRL
+mercadobitcoin.btc/usdt.sell = BTC/BRL
+novadax.eth/usdt.buy = ETH/BRL
+novadax.eth/usdt.sell = ETH/BRL
+gate.eth/usdt.buy = ETH/USDT
+gate.eth/usdt.sell = ETH/USDT
+mexc.eth/usdt.buy = ETH/USDT
+mexc.eth/usdt.sell = ETH/USDT
+mercadobitcoin.eth/usdt.buy = ETH/BRL
+mercadobitcoin.eth/usdt.sell = ETH/BRL
+novadax.sol/usdt.buy = SOL/BRL
+novadax.sol/usdt.sell = SOL/BRL
+gate.sol/usdt.buy = SOL/USDT
+gate.sol/usdt.sell = SOL/USDT
+mexc.sol/usdt.buy = SOL/USDT
+mexc.sol/usdt.sell = SOL/USDT
+mercadobitcoin.sol/usdt.buy = SOL/BRL
+mercadobitcoin.sol/usdt.sell = SOL/BRL
+
+[ROUTER]
+anchor_mode = LOCAL
+sticky_per_side = true
+min_notional_usdt = 1
+track_local_bps = 15
+reprice_cooldown_sec = 5
+place_both_sides_per_exchange = true
+auto_post_fill_opposite = true
+post_fill_use_filled_qty = true
+alert_cooldown_sec = 120
+balance_ttl_sec = 8
+one_cycle_and_exit = false
+
+[ADAPTERS_OVERRIDES]
+mercadobitcoin.btc/brl.min_notional = 5
+mercadobitcoin.btc/brl.min_qty = 0.00002
+mercadobitcoin.btc/brl.amount_step = 0.00001
+mercadobitcoin.btc/brl.price_step = 1
+mercadobitcoin.eth/brl.min_notional = 5
+mercadobitcoin.eth/brl.min_qty = 0.0005
+mercadobitcoin.eth/brl.amount_step = 0.0001
+mercadobitcoin.eth/brl.price_step = 0.1
+mercadobitcoin.sol/brl.min_notional = 2
+mercadobitcoin.sol/brl.min_qty = 0.01
+mercadobitcoin.sol/brl.amount_step = 0.001
+mercadobitcoin.sol/brl.price_step = 0.01
+novadax.btc/brl.min_qty = 0.0000563
+novadax.btc/brl.min_notional = 4.61
+novadax.eth/brl.min_qty = 0.00119931
+novadax.eth/brl.min_notional = 4.61
+novadax.sol/brl.min_qty = 0.038
+novadax.sol/brl.min_notional = 4.61
+novadax.sol/brl.amount_step = 0.001
+novadax.sol/brl.price_step = 0.01
+mexc.btc/usdt.min_notional = 1
+mexc.btc/usdt.min_qty = 0.000005
+mexc.btc/usdt.amount_step = 0.000001
+mexc.btc/usdt.price_step = 0.1
+mexc.eth/usdt.min_notional = 1
+mexc.eth/usdt.min_qty = 0.0001
+mexc.eth/usdt.amount_step = 0.0001
+mexc.eth/usdt.price_step = 0.01
+mexc.sol/usdt.min_notional = 1
+mexc.sol/usdt.min_qty = 0.01
+mexc.sol/usdt.amount_step = 0.01
+mexc.sol/usdt.price_step = 0.001
+gate.btc/usdt.min_notional = 10
+gate.btc/usdt.min_qty = 0.00009
+gate.btc/usdt.amount_step = 0.00001
+gate.btc/usdt.price_step = 0.1
+gate.eth/usdt.min_notional = 10
+gate.eth/usdt.min_qty = 0.003
+gate.eth/usdt.amount_step = 0.001
+gate.eth/usdt.price_step = 0.01
+gate.sol/usdt.min_notional = 3
+gate.sol/usdt.min_qty = 0.01
+gate.sol/usdt.amount_step = 0.01
+gate.sol/usdt.price_step = 0.001
+
