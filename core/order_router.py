@@ -332,6 +332,8 @@ class OrderRouter:
 
         base, quote = symbol_local.split("/")
 
+        balance_used_usdt = 0.0
+
         if mode == "FIXO_USDT":
             notional_usdt = max(0.0, float(value))
             # bot_config.risk_percentage: limite adicional por operação.
@@ -339,6 +341,7 @@ class OrderRouter:
             if side_l == "buy":
                 q_free = await self._quote_free(ex, quote, ex_name=ex_name)
                 q_usdt = (float(q_free) / float(self.ex_hub.usdt_brl)) if quote == "BRL" else float(q_free)
+                balance_used_usdt = float(q_usdt)
                 notional_usdt = min(notional_usdt, q_usdt)
                 if risk_frac > 0:
                     notional_usdt = min(notional_usdt, q_usdt * risk_frac)
@@ -350,6 +353,7 @@ class OrderRouter:
                 if price_usdt > 0:
                     amount = notional_usdt / price_usdt
                 b_free = await self._base_free(ex, base, ex_name=ex_name)
+                balance_used_usdt = float(b_free) * float(price_usdt)
                 amount = min(amount, float(b_free))
                 if risk_frac > 0:
                     amount = min(amount, float(b_free) * risk_frac)
@@ -360,6 +364,7 @@ class OrderRouter:
             if side_l == "buy":
                 q_free = await self._quote_free(ex, quote, ex_name=ex_name)
                 q_usdt = (float(q_free) / float(self.ex_hub.usdt_brl)) if quote == "BRL" else float(q_free)
+                balance_used_usdt = float(q_usdt)
                 notional_usdt = q_usdt * pct
                 if max_daily_loss > 0:
                     notional_usdt = min(notional_usdt, float(max_daily_loss))
@@ -367,7 +372,20 @@ class OrderRouter:
                     amount = notional_usdt / price_usdt
             else:
                 b_free = await self._base_free(ex, base, ex_name=ex_name)
+                balance_used_usdt = float(b_free) * float(price_usdt)
                 amount = float(b_free) * pct
+
+        computed_notional = float(amount) * float(price_usdt)
+        log.info(
+            "[position_sizing] pair=%s ex=%s side=%s risk_percentage=%.4f balance_used_usdt=%.8f qty=%.8f notional_usdt=%.8f",
+            pair,
+            ex_name,
+            side_l,
+            float(risk_percentage or 0.0),
+            float(balance_used_usdt),
+            float(amount),
+            float(computed_notional),
+        )
 
         return float(amount)
 

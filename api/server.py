@@ -214,6 +214,19 @@ def api_config():
     return jsonify({"ok": ok, "message": msg}), status
 
 
+
+
+@app.route("/api/bot-config", methods=["GET", "POST"])
+def api_bot_config():
+    if request.method == "GET":
+        data = handlers.get_bot_configs()
+        return jsonify(data)
+
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    ok, msg = handlers.upsert_bot_config(payload)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": msg}), status
+
 @app.route("/api/debug")
 def api_debug():
     data = handlers.debug_snapshot()
