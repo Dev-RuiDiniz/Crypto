@@ -26,7 +26,7 @@ log = get_logger("state_store")
 class StateStore:
     def __init__(self, cfg: configparser.ConfigParser):
         self.cfg = cfg
-        self.sqlite_path = self.cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db")
+        self.sqlite_path = os.path.abspath(self.cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db"))
         self.csv_enable = self.cfg.getboolean("GLOBAL", "CSV_ENABLE", fallback=True)
 
         # Garante pasta
@@ -128,6 +128,17 @@ class StateStore:
                 notional_usdt REAL,
                 cycle_id TEXT,
                 payload TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runtime_status (
+                worker_pid INTEGER,
+                started_at REAL,
+                last_heartbeat_at REAL,
+                db_path TEXT,
+                version TEXT
             )
             """
         )
@@ -245,6 +256,33 @@ class StateStore:
 
     # ------------------------------------------------------------------
     # API pública — gravação
+
+    def set_runtime_status(self, worker_pid: int, started_at: float, db_path: str, version: str) -> None:
+        try:
+            self._conn.execute("DELETE FROM runtime_status")
+            self._conn.execute(
+                """
+                INSERT INTO runtime_status(worker_pid, started_at, last_heartbeat_at, db_path, version)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (int(worker_pid), float(started_at), float(time.time()), str(db_path), str(version)),
+            )
+            self._conn.commit()
+        except Exception as e:
+            log.warning(f"[runtime_status] set falha: {e}")
+
+    def heartbeat_runtime_status(self, worker_pid: int) -> None:
+        try:
+            self._conn.execute(
+                """
+                UPDATE runtime_status
+                SET last_heartbeat_at = ?, worker_pid = ?
+                """,
+                (float(time.time()), int(worker_pid)),
+            )
+            self._conn.commit()
+        except Exception as e:
+            log.warning(f"[runtime_status] heartbeat falha: {e}")
 
     def log_event(self, event_type: str, payload: Dict[str, Any]):
         ts = time.time()

@@ -11,6 +11,8 @@ import os
 import json
 from datetime import datetime
 
+from app.version import APP_VERSION
+
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # LOG DE QUE ESTE ARQUIVO ESTÁ SENDO CARREGADO
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -243,6 +245,16 @@ class MainMonitor:
         self._last_open_orders_snapshot: List[Dict[str, Any]] = []
 
         ulog.info(f"[MONITOR] snapshot_path configurado para: {self.snapshot_path}")
+
+        try:
+            self.state.set_runtime_status(
+                worker_pid=os.getpid(),
+                started_at=time.time(),
+                db_path=getattr(self.state, "sqlite_path", ""),
+                version=APP_VERSION,
+            )
+        except Exception as exc:
+            log.warning("[runtime_status] falha ao inicializar: %s", exc)
 
     # ---------------- helpers SPREAD ----------------
 
@@ -1230,6 +1242,11 @@ class MainMonitor:
                     )
                     self.board.finalize()
                     return
+
+                try:
+                    self.state.heartbeat_runtime_status(worker_pid=os.getpid())
+                except Exception:
+                    pass
 
                 elapsed_ms = int((time.time() - t0) * 1000)
                 sleep_ms = max(0, self.loop_interval_ms - elapsed_ms)
