@@ -46,12 +46,30 @@ def _get_bundle_dir() -> str:
     return _get_work_dir()
 
 
+def _select_frontend_dir() -> str:
+    candidates = [
+        os.path.join(_get_work_dir(), "frontend", "build"),
+        os.path.join(_get_bundle_dir(), "frontend", "build"),
+        os.path.join(_get_work_dir(), "frontend", "src"),
+        os.path.join(_get_bundle_dir(), "frontend", "src"),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(os.path.join(candidate, "index.html")):
+            return candidate
+    return candidates[-1]
+
+
+def _resolve_data_dir() -> str:
+    local_appdata = os.getenv("LOCALAPPDATA", "").strip()
+    if local_appdata:
+        return os.path.join(local_appdata, "TradingBot", "data")
+    return os.path.join(_get_work_dir(), "data")
+
+
 WORK_DIR = _get_work_dir()
 BUNDLE_DIR = _get_bundle_dir()
-FRONTEND_DIR_WORK = os.path.join(WORK_DIR, "frontend", "src")
-FRONTEND_DIR_BUNDLE = os.path.join(BUNDLE_DIR, "frontend", "src")
-FRONTEND_DIR = FRONTEND_DIR_WORK if os.path.isdir(FRONTEND_DIR_WORK) else FRONTEND_DIR_BUNDLE
-DATA_DIR = os.path.join(WORK_DIR, "data")
+FRONTEND_DIR = _select_frontend_dir()
+DATA_DIR = _resolve_data_dir()
 
 logger.info("==================================================")
 logger.info("INICIANDO SERVIDOR ARBIT")
@@ -75,6 +93,17 @@ app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static" if STA
 def _safe_send(base_dir: str, filename: str):
     return send_from_directory(base_dir, filename)
 
+
+
+
+def _open_logs_dir() -> bool:
+    log_dir = os.getenv("TRADINGBOT_LOG_DIR", "").strip()
+    if not log_dir or not os.path.isdir(log_dir):
+        return False
+    if os.name == "nt":
+        os.startfile(log_dir)  # type: ignore[attr-defined]
+        return True
+    return False
 
 def _index_exists() -> bool:
     return os.path.isfile(os.path.join(FRONTEND_DIR, "index.html"))
@@ -110,6 +139,13 @@ def frontend_files(filename: str):
     if _index_exists():
         return _safe_send(FRONTEND_DIR, "index.html")
     return (f"Arquivo não encontrado no frontend: {filename}\nFRONTEND_DIR: {FRONTEND_DIR}\n", 404)
+
+
+
+@app.route("/api/open-logs", methods=["POST"])
+def api_open_logs():
+    opened = _open_logs_dir()
+    return jsonify({"ok": opened})
 
 
 @app.route("/api/ping")

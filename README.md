@@ -288,3 +288,38 @@ Critérios validados na suíte:
 - `docs/auditoria-solicitacao-cliente.md` — auditoria completa da solicitação do cliente.
 - `docs/tests-paper-multipair.md` — referência dos testes paper multi-pair.
 - `docs/reload-config.md` — detalhes de recarga de configuração.
+
+## 11) Instalação (Windows)
+
+### Build do executável (PyInstaller)
+
+```powershell
+build\windows\build_exe.bat
+```
+
+Saída esperada (one-folder):
+- `dist\TradingBot\TradingBot.exe`
+
+O launcher do executável:
+- persiste dados em `%LOCALAPPDATA%\TradingBot\data\state.db`;
+- grava logs em `%LOCALAPPDATA%\TradingBot\logs\`;
+- tenta porta default e, se ocupada, escolhe automaticamente uma porta livre entre `5000-5100`;
+- abre o dashboard automaticamente após healthcheck da API.
+
+Também é possível abrir a pasta de logs diretamente:
+
+```powershell
+TradingBot.exe --open-logs
+```
+
+### Instalador (Inno Setup)
+
+1. Gere o executável com `build\windows\build_exe.bat`.
+2. Abra `build\windows\installer.iss` no Inno Setup e compile.
+3. Saída esperada: `dist\TradingBotSetup.exe`.
+
+Características do instalador:
+- instalação per-user (`PrivilegesRequired=lowest`) em `{localappdata}\Programs\TradingBot`;
+- atalho no Menu Iniciar (obrigatório) e Desktop opcional;
+- opção “Executar TradingBot” após concluir instalação;
+- desinstalação remove arquivos do app, mantendo `%LOCALAPPDATA%\TradingBot\` por padrão.

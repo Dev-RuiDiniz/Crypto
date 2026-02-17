@@ -483,8 +483,8 @@ def main():
     base_dir = config_path.parent
     os.chdir(base_dir)
     
-    # Verifica se estamos no diretório correto
-    if not (Path.cwd() / "bot.py").exists():
+    # Verifica se estamos no diretório correto (somente modo source)
+    if not getattr(sys, "frozen", False) and not (Path.cwd() / "bot.py").exists():
         print(f"[ERRO] ❌ Arquivo bot.py não encontrado no diretório {Path.cwd()}")
         print("       Execute a partir da raiz do projeto ARBIT.")
         sys.exit(1)
