@@ -16,18 +16,20 @@ except Exception:
 
 log = get_logger("strategy_arbitrage")
 from core.risk_policy import RiskPolicy
+from core.notification_service import NotificationEventType, NotificationSeverity
 
 
 class StrategyArbitrageSimple:
     _locks: Dict[Tuple[str, str], asyncio.Lock] = {}
 
-    def __init__(self, cfg, ex_hub, state, risk, tenant_id: str = "default", risk_policy=None):
+    def __init__(self, cfg, ex_hub, state, risk, tenant_id: str = "default", risk_policy=None, notification_service=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.state = state
         self.risk = risk
         self.tenant_id = tenant_id
-        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk)
+        self.notification_service = notification_service
+        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk, notification_service=notification_service)
 
     @staticmethod
     def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -268,12 +270,40 @@ class StrategyArbitrageSimple:
 
             if mode == "ONE_LEG":
                 self.state.log_event("ARBITRAGE_EXECUTION_SUCCESS", {"tenantId": self.tenant_id, "symbol": symbol, "exchangeA": buy_ex, "exchangeB": sell_ex, "estimatedProfit": opp["estimatedProfit"], "clientOrderId": leg1.get("clientOrderId", "")})
+                if self.notification_service is not None:
+                    self.notification_service.notify_nowait(
+                        tenant_id=self.tenant_id,
+                        event_type=NotificationEventType.ARBITRAGE_EXECUTED,
+                        severity=NotificationSeverity.IMPORTANT,
+                        payload={
+                            "symbol": symbol,
+                            "exchange": f"{buy_ex}->{sell_ex}",
+                            "amount": max_trade_size,
+                            "price": opp.get("estimatedProfit"),
+                            "reason": "arbitrage_executed",
+                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        },
+                    )
                 self.state.upsert_arbitrage_state(self.tenant_id, symbol, runtime_state="COOLDOWN", last_opportunity=opp, last_execution={"status": "SUCCESS", "executedSize": max_trade_size, "profitEstimate": opp["estimatedProfit"], "timestamp": time.time()}, last_success_ts=now_ms)
                 return {"state": "SUCCESS"}
 
             try:
                 leg2 = await self._submit_leg(exchange=sell_ex, symbol=symbol, side="sell", amount=max_trade_size, price_usdt=sell_price, cycle_id=cycle_id, leg="SELL")
                 self.state.log_event("ARBITRAGE_EXECUTION_SUCCESS", {"tenantId": self.tenant_id, "symbol": symbol, "exchangeA": buy_ex, "exchangeB": sell_ex, "estimatedProfit": opp["estimatedProfit"], "clientOrderId": leg2.get("clientOrderId", "")})
+                if self.notification_service is not None:
+                    self.notification_service.notify_nowait(
+                        tenant_id=self.tenant_id,
+                        event_type=NotificationEventType.ARBITRAGE_EXECUTED,
+                        severity=NotificationSeverity.IMPORTANT,
+                        payload={
+                            "symbol": symbol,
+                            "exchange": f"{buy_ex}->{sell_ex}",
+                            "amount": max_trade_size,
+                            "price": opp.get("estimatedProfit"),
+                            "reason": "arbitrage_executed",
+                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        },
+                    )
                 self.state.upsert_arbitrage_state(self.tenant_id, symbol, runtime_state="COOLDOWN", last_opportunity=opp, last_execution={"status": "SUCCESS", "executedSize": max_trade_size, "profitEstimate": opp["estimatedProfit"], "timestamp": time.time()}, last_success_ts=now_ms)
                 return {"state": "SUCCESS"}
             except Exception as exc:

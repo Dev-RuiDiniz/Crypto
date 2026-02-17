@@ -147,3 +147,8 @@ A criação de ordens agora é protegida por uma `RiskPolicy` central obrigatór
 - kill switch global e por par
 
 Bloqueios ficam persistidos em `risk_events` e podem ser consultados via API para o dashboard.
+
+## Alertas (Sprint 9)
+
+O projeto suporta alertas externos por tenant (Email SMTP e Webhook/WhatsApp opcional), com filtro por severidade/evento, rate-limit e teste manual no dashboard em **Configurações → Notificações**. Veja detalhes em `docs/sprint-9/README.md`.
+

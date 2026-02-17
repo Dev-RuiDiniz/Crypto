@@ -86,9 +86,11 @@ class ExchangeHub:
         config: configparser.ConfigParser,
         credentials_service: Optional[ExchangeCredentialsService] = None,
         tenant_id: str = "default",
+        notification_service=None,
     ):
         self.cfg = config
         self.tenant_id = tenant_id
+        self.notification_service = notification_service
         self.credentials_service = credentials_service or ExchangeCredentialsService(config)
         self.mode = self.cfg.get("GLOBAL", "MODE", fallback="PAPER").upper()
         self.usdt_brl = float(self.cfg.get("GLOBAL", "USDT_BRL_RATE", fallback="5.50"))
@@ -128,6 +130,7 @@ class ExchangeHub:
             provider=self.credential_provider,
             service=self.credentials_service,
             factory=self.client_factory,
+            notification_service=self.notification_service,
         )
         self._markets_loaded: Dict[str, bool] = {}
         self.symbol_map = self._build_symbol_map()

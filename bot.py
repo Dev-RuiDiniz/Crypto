@@ -23,6 +23,7 @@ from app.version import APP_VERSION
 from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
 from core.audit_log_service import AuditLogService
 from core.market_data import MarketDataService
+from core.notification_service import NotificationService
 
 APP_NAME = "ARBIT"
 log = get_logger(APP_NAME)         # técnico -> arquivo detalhado
@@ -335,8 +336,9 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
     tenant_id = (os.getenv("TRADINGBOT_TENANT_ID", "") or cfg.get("GLOBAL", "TENANT_ID", fallback="default")).strip() or "default"
     credentials_service = ExchangeCredentialsService(cfg)
     _ = AuditLogService(cfg)
-    ex_hub = ExchangeHub(cfg, credentials_service=credentials_service, tenant_id=tenant_id)
-    market_data = MarketDataService(cfg, ex_hub, tenant_id=tenant_id)
+    notification_service = NotificationService(sqlite_path=state.sqlite_path, mode=cfg.get("GLOBAL", "MODE", fallback="LIVE"))
+    ex_hub = ExchangeHub(cfg, credentials_service=credentials_service, tenant_id=tenant_id, notification_service=notification_service)
+    market_data = MarketDataService(cfg, ex_hub, tenant_id=tenant_id, notification_service=notification_service)
     ex_hub.market_data = market_data
     try:
         await ex_hub.connect_all()
@@ -466,9 +468,9 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         strategy = StrategySpread(cfg)
         portfolio = Portfolio(cfg, ex_hub)
         risk = RiskManager(cfg)
-        strategy_arbitrage = StrategyArbitrageSimple(cfg, ex_hub, state, risk, tenant_id=tenant_id)
+        strategy_arbitrage = StrategyArbitrageSimple(cfg, ex_hub, state, risk, tenant_id=tenant_id, notification_service=notification_service)
         router = OrderRouter(cfg, ex_hub, portfolio, risk, state)
-        order_manager = OrderManager(cfg, ex_hub, state, risk)
+        order_manager = OrderManager(cfg, ex_hub, state, risk, notification_service=notification_service)
         monitor = MainMonitor(cfg, ex_hub, strategy, router, order_manager, portfolio, state, risk, strategy_arbitrage=strategy_arbitrage)
     except Exception as e:
         log.error(f"Falha ao criar componentes: {e}", exc_info=True)

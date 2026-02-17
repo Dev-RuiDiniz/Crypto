@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 
+from core.notification_service import NotificationEventType, NotificationSeverity
+
 try:
     from utils.logger import get_logger
 except Exception:
@@ -115,7 +117,7 @@ class PollingOrderBookProvider:
 
 
 class MarketDataService:
-    def __init__(self, cfg, ex_hub, tenant_id: str, ws_providers: Optional[Dict[str, BaseWsOrderBookProvider]] = None):
+    def __init__(self, cfg, ex_hub, tenant_id: str, ws_providers: Optional[Dict[str, BaseWsOrderBookProvider]] = None, notification_service=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.tenant_id = tenant_id
@@ -131,6 +133,7 @@ class MarketDataService:
 
         self.polling_provider = PollingOrderBookProvider(ex_hub=ex_hub, orderbook_limit=self.orderbook_limit)
         self.ws_providers = ws_providers or {"mexc": MEXCWsOrderBookProvider(depth_limit=self.orderbook_limit, timeout_ms=self.ws_stale_ms)}
+        self.notification_service = notification_service
 
     def _key(self, exchange: str, symbol: str) -> CacheKey:
         return (self.tenant_id, exchange.lower(), symbol.upper())
@@ -209,6 +212,20 @@ class MarketDataService:
                 circuit_state = "POLL_ACTIVE"
                 await self._mark_state(exchange, symbol, source="POLL", state="DEGRADED", error=err)
                 log.warning("MARKETDATA_FALLBACK_TO_POLL tenantId=%s exchange=%s symbol=%s source=POLL state=DEGRADED errorCode=%s", self.tenant_id, exchange, symbol, err)
+                if self.notification_service is not None:
+                    self.notification_service.notify_nowait(
+                        tenant_id=self.tenant_id,
+                        event_type=NotificationEventType.WS_DEGRADED,
+                        severity=NotificationSeverity.IMPORTANT,
+                        payload={
+                            "symbol": symbol,
+                            "exchange": exchange,
+                            "amount": 0,
+                            "price": 0,
+                            "reason": err,
+                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        },
+                    )
 
                 poll_started = int(time.time() * 1000)
                 while self._running and circuit_state == "POLL_ACTIVE":

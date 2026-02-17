@@ -10,6 +10,7 @@ from ccxt.base.errors import AuthenticationError
 
 from core.credential_provider import CredentialProvider, CredentialRecord
 from core.credentials_service import ExchangeCredentialsService
+from core.notification_service import NotificationEventType, NotificationSeverity
 from utils.logger import get_logger
 
 log = get_logger("exchange_client_manager")
@@ -99,11 +100,13 @@ class ExchangeClientManager:
         provider: CredentialProvider,
         service: ExchangeCredentialsService,
         factory: ExchangeClientFactory,
+        notification_service=None,
     ):
         self.tenant_id = tenant_id
         self.provider = provider
         self.service = service
         self.factory = factory
+        self.notification_service = notification_service
         self.cache: Dict[str, ClientCacheEntry] = {}
         self.rotation_locks: Dict[str, asyncio.Lock] = {}
         self.operation_locks: Dict[str, asyncio.Lock] = {}
@@ -251,6 +254,20 @@ class ExchangeClientManager:
             entry.version,
             category,
         )
+        if self.notification_service is not None:
+            self.notification_service.notify_nowait(
+                tenant_id=self.tenant_id,
+                event_type=NotificationEventType.AUTH_FAILED,
+                severity=NotificationSeverity.ERROR,
+                payload={
+                    "symbol": "-",
+                    "exchange": exchange,
+                    "amount": 0,
+                    "price": 0,
+                    "reason": category,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+            )
 
     def mark_resumed_if_applicable(self, exchange: str):
         key = self._key(exchange)
