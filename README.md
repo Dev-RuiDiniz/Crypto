@@ -71,3 +71,4 @@ Documentação detalhada: **[`docs/build-windows.md`](docs/build-windows.md)**.
 - Runbook usuário final: [`docs/como-usar.md`](docs/como-usar.md)
 - Build para Windows: [`docs/build-windows.md`](docs/build-windows.md)
 - QA pós-build: [`docs/checklist-qa.md`](docs/checklist-qa.md)
+- Sprint 3 (Dashboard Exchanges): [`docs/sprint-3/README.md`](docs/sprint-3/README.md)

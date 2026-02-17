@@ -4,11 +4,13 @@ const e = React.createElement;
 
 import { Dashboard } from "./components/Dashboard.js";
 import { BotConfigPanel } from "./components/BotConfigPanel.js";
+import { ExchangesSettings } from "./components/ExchangesSettings.js";
 
 const REFRESH_MS = 2000;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [settingsTab, setSettingsTab] = useState("exchanges");
   const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
@@ -30,12 +32,13 @@ export default function App() {
       e(
         "div",
         { className: "app-header-inner" },
-        e("div", null, e("h1", null, "ARBIT Terminal"), e("span", null, "Operação via DB (Sprint 2)")),
+        e("div", null, e("h1", null, "ARBIT Terminal"), e("span", null, "Operação via DB (Sprint 3)")),
         e(
           "div",
           { className: "tabs" },
           e("button", { className: "tab-button" + (activeTab === "dashboard" ? " tab-button-active" : ""), onClick: () => setActiveTab("dashboard") }, "Dashboard"),
-          e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Config do Bot (DB)")
+          e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Config do Bot (DB)"),
+          e("button", { className: "tab-button" + (activeTab === "settings" ? " tab-button-active" : ""), onClick: () => setActiveTab("settings") }, "Configurações")
         )
       )
     ),
@@ -54,7 +57,17 @@ export default function App() {
               ),
               e(Dashboard, { refreshMs: REFRESH_MS })
             )
-          : e(BotConfigPanel)
+          : activeTab === "bot-config"
+            ? e(BotConfigPanel)
+            : e(React.Fragment, null,
+                e("div", { className: "panel" },
+                  e("h2", null, "Configurações"),
+                  e("div", { className: "tabs" },
+                    e("button", { className: "tab-button" + (settingsTab === "exchanges" ? " tab-button-active" : ""), onClick: () => setSettingsTab("exchanges") }, "Exchanges")
+                  )
+                ),
+                settingsTab === "exchanges" && e(ExchangesSettings)
+              )
       )
     )
   );
