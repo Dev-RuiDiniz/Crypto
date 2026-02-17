@@ -3,7 +3,7 @@ const { useState, useEffect } = React;
 const e = React.createElement;
 
 import { Dashboard } from "./components/Dashboard.js";
-import { BotConfigPanel } from "./components/BotConfigPanel.js";
+import { TradingSettings } from "./components/TradingSettings.js";
 import { ExchangesSettings } from "./components/ExchangesSettings.js";
 import { NotificationsSettings } from "./components/NotificationsSettings.js";
 import { GoLiveChecklist } from "./components/GoLiveChecklist.js";
@@ -39,7 +39,7 @@ export default function App() {
           "div",
           { className: "tabs" },
           e("button", { className: "tab-button" + (activeTab === "dashboard" ? " tab-button-active" : ""), onClick: () => setActiveTab("dashboard") }, "Dashboard"),
-          e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Config do Bot (DB)"),
+          e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Trading"),
           e("button", { className: "tab-button" + (activeTab === "settings" ? " tab-button-active" : ""), onClick: () => setActiveTab("settings") }, "Configurações"),
           e("button", { className: "tab-button" + (activeTab === "go-live" ? " tab-button-active" : ""), onClick: () => setActiveTab("go-live") }, "Go Live")
         )
@@ -61,7 +61,7 @@ export default function App() {
               e(Dashboard, { refreshMs: REFRESH_MS })
             )
           : activeTab === "bot-config"
-            ? e(BotConfigPanel)
+            ? e(TradingSettings)
             : activeTab === "go-live"
               ? e(GoLiveChecklist)
               : e(React.Fragment, null,

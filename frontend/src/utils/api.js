@@ -81,6 +81,21 @@ export const api = {
   revokeExchangeCredential: (tenantId, id) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials/${encodeURIComponent(id)}`, { method: "DELETE" }),
   testExchangeCredential: (tenantId, id) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials/${encodeURIComponent(id)}/test`, { method: "POST" }),
 
+
+
+  getPairs: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs`),
+  createPair: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs`, { method: "POST", body: JSON.stringify(payload) }),
+  updatePair: (tenantId, pairId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deletePair: (tenantId, pairId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}`, { method: "DELETE" }),
+  getPairSpread: (tenantId, pairId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/spread`),
+  updatePairSpread: (tenantId, pairId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/spread`, { method: "PUT", body: JSON.stringify(payload) }),
+  getPairArbitrage: (tenantId, pairId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/arbitrage`),
+  updatePairArbitrage: (tenantId, pairId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/arbitrage`, { method: "PUT", body: JSON.stringify(payload) }),
+  getGlobalRisk: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/risk`),
+  updateGlobalRisk: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/risk`, { method: "PUT", body: JSON.stringify(payload) }),
+  getPairRisk: (tenantId, pairId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/risk`),
+  updatePairRisk: (tenantId, pairId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/risk`, { method: "PUT", body: JSON.stringify(payload) }),
+  getPairRuntimeStatus: (tenantId, pairId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/pairs/${encodeURIComponent(pairId)}/runtime-status`),
   getNotificationSettings: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`),
   updateNotificationSettings: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`, { method: "PUT", body: JSON.stringify(payload) }),
   testNotification: (tenantId, channel) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/test`, { method: "POST", body: JSON.stringify({ channel }) }),

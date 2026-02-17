@@ -64,12 +64,13 @@ npm run build
 ```
 
 ## 4.6 Como configurar
-- **Credenciais**: via API/dashboard de credenciais (criptografadas em repouso).
-- **Pares**: seção `[PAIRS]` e painel de configuração.
-- **Spread %**: seção `[SPREAD]` por par.
-- **Arbitragem**: habilitação por par/configuração runtime.
-- **Risco**: limites globais e por par em `RiskPolicy`.
-- **Alertas**: canais e severidade por tenant.
+- **Credenciais:** Dashboard → Configurações → Exchanges (criptografadas em repouso).
+- **Pares:** Dashboard → Trading → PAIRS (habilitar/desabilitar por exchange/symbol).
+- **Spread %:** Dashboard → Trading → SPREAD (por par).
+- **Arbitragem:** Dashboard → Trading → ARBITRAGE (por par; runtime).
+- **Risco:** Dashboard → Trading → RISK (global e por par).
+- **Alertas:** Dashboard → Configurações → Notificações (por tenant).
+- Alterações são persistidas em DB, auditadas e aplicadas em runtime no próximo ciclo do worker.
 
 ## 4.7 Como usar
 1. Adicionar credenciais de exchange.
