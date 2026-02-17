@@ -1,74 +1,129 @@
-# TradingBot — Executável Local (Windows)
+# Robô de Trading Cripto (Spot) — Estado Atual do Projeto
 
-Bot de trading com execução local (sem cloud obrigatória), dashboard web, configuração operacional via SQLite e pacote para instalação no Windows.
+Este repositório contém um bot de trading spot multipar com execução local, API Flask, dashboard web e persistência em SQLite.
 
-## Visão geral
+> Status de aderência ao briefing: **PARCIAL**. Consulte `AUDITORIA_PROJETO.md`.
 
-- **Formato de entrega:** `TradingBot.exe` + instalador `TradingBotSetup.exe`.
-- **Execução local:** launcher sobe API + worker e abre dashboard automaticamente.
-- **Persistência:** dados e logs em `%LOCALAPPDATA%\TradingBot\...`.
-- **Config operacional:** via DB (`/api/bot-config`, `/api/bot-global-config`) com aplicação imediata controlada por `config_version`.
+## O que o bot faz hoje
+- Opera múltiplos pares configuráveis.
+- Calcula alvos por spread (%) configurável por par.
+- Mantém ordens (cancel/recreate) conforme variação do mercado.
+- Executa em modo **PAPER** e **LIVE**.
+- Exibe status em dashboard (mids, ordens, saldos, eventos).
+- Permite configuração via API/DB sem restart (com `config_version`).
+- Possui cofre de credenciais com criptografia AES-GCM no SQLite.
 
-## Requisitos (usuário final)
+## O que ainda não está completo
+- Streaming websocket de order book no loop principal (hoje: polling).
+- Estratégia explícita de arbitragem simples (detector + execução de duas pernas).
+- Idempotência forte de ordens com `clientOrderId` persistente.
 
-- Windows 10/11.
-- Permissão de execução para aplicativo instalado em perfil do usuário.
+---
 
-## Instalação (usuário final)
+## Arquitetura resumida
+```text
+config.txt + DB config -> bot.py/MainMonitor
+-> strategy + router + order manager
+-> ExchangeHub (CCXT + MB v4)
+-> StateStore (SQLite/CSV/snapshot)
+-> API Flask -> Dashboard
+```
 
-1. Execute `TradingBotSetup.exe`.
-2. Conclua o assistente.
-3. (Opcional) marque atalho na Área de Trabalho.
-4. Ao final, clique em **Executar TradingBot**.
+Documentação consolidada em `/docs`:
+- [00-overview](docs/00-overview.md)
+- [01-setup](docs/01-setup.md)
+- [02-architecture](docs/02-architecture.md)
+- [03-configuration](docs/03-configuration.md)
+- [04-exchanges](docs/04-exchanges.md)
+- [05-strategies](docs/05-strategies.md)
+- [06-risk-management](docs/06-risk-management.md)
+- [07-operations-runbook](docs/07-operations-runbook.md)
+- [08-troubleshooting](docs/08-troubleshooting.md)
+- [09-security](docs/09-security.md)
+- [10-api](docs/10-api.md)
+- [11-dashboard](docs/11-dashboard.md)
+- [12-paper-vs-live](docs/12-paper-vs-live.md)
 
-Guia completo: **[`docs/como-usar.md`](docs/como-usar.md)**.
+---
 
-## Primeiro uso
+## Setup local
 
-1. Abra o app (Menu Iniciar ou atalho).
-2. Aguarde abrir o dashboard no navegador.
-3. Em **Config do Bot (DB)**:
-   - ajuste **Config Global** (mode, loop, kill switch, limites),
-   - ajuste **Config por Par** (`enabled`, `risk%`, `strategy`).
-4. Confira o status **“Aplicado às …”**.
+### Dependências
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-## Onde ficam dados e logs
+### Variáveis de ambiente
+- `EXCHANGE_CREDENTIALS_MASTER_KEY` (obrigatória para decriptar/criptografar credenciais)
+- `TRADINGBOT_TENANT_ID` (opcional, default `default`)
 
-Base:
-- `%LOCALAPPDATA%\TradingBot\`
+Veja `.env.example`.
 
-Principais arquivos:
-- `data\state.db`
-- `logs\app.log`
-- `logs\api.log`
-- `logs\worker.log`
+### Configuração
+- Copie/edite `config.txt` com base em `config.template.txt`.
+- Configure pares e percentuais nas seções `[PAIRS]`, `[SPREAD]`, `[STAKE]`, `[RISK]`.
 
-## Health endpoints
+---
 
-- `GET /api/health`
-- `GET /api/health/db`
-- `GET /api/health/worker`
-- `GET /api/config-status` (sync DB x worker)
+## Como rodar
+
+### Worker + API (launcher)
+```bash
+python run_arbit.py
+```
+
+### Worker isolado
+```bash
+python bot.py --config config.txt
+```
+
+### API isolada
+```bash
+python -m api.server --config config.txt
+```
+
+Dashboard: `http://127.0.0.1:8000`
+
+---
+
+## Como configurar pares e percentuais
+
+- Em arquivo INI:
+  - `[PAIRS] LIST = SOL/USDT,DOGE/USDT`
+  - `[SPREAD] SOL/USDT=0.04` (ou `SOL/USDT_BUY_PCT`/`SELL_PCT`)
+  - `[RISK]` e `[STAKE]` para limites e tamanho de ordem.
+- Em runtime:
+  - via API `/api/bot-config` e `/api/bot-global-config`.
+  - monitor recarrega mudanças via `config_version`.
+
+## Como validar multipar
+- Defina 2+ pares em `[PAIRS]` e ative `config_pairs` (via API/configuração).
+- Verifique `/api/mids`, `/api/orders` e tabela `paper_orders` (em PAPER).
+
+## Paper vs Live
+- `MODE=PAPER`: simulação sem envio real de ordens.
+- `MODE=REAL`: execução real nas exchanges habilitadas.
+
+Recomendação: validar primeiro em PAPER (`docs/12-paper-vs-live.md`).
+
+---
+
+## Segurança
+- Não coloque segredos reais em `config.txt`.
+- Prefira cofre `exchange_credentials` (API de credenciais).
+- Use API keys com permissão **trade-only** e **sem withdraw**.
+- Logs aplicam redaction de campos sensíveis.
 
 ## Troubleshooting rápido
+- `GET /api/health`, `/api/health/db`, `/api/health/worker`
+- `GET /api/config-status`
+- Confira `logs/` para erros de rede/auth/rate limit.
 
-- **Dashboard não abre:** acesse manualmente `http://127.0.0.1:8000` (ou porta alternativa logada no `app.log`).
-- **Worker “down/stale”:** verifique `%LOCALAPPDATA%\TradingBot\logs\worker.log`.
-- **Config não aplicada:** consulte `/api/config-status` e confirme `in_sync=true`.
-- **Sem escrita no banco:** valide permissões em `%LOCALAPPDATA%\TradingBot\data`.
+---
 
-## Como gerar executáveis (dev/build)
-
-Resumo:
-1. `build\windows\build_exe.bat` (gera `dist\TradingBot\TradingBot.exe`).
-2. Compile `build\windows\installer.iss` no Inno Setup (gera `dist\TradingBotSetup.exe`).
-
-Documentação detalhada: **[`docs/build-windows.md`](docs/build-windows.md)**.
-
-## Documentação complementar
-
-- Auditoria pós-sprints: [`AUDITORIA_POS_SPRINTS.md`](AUDITORIA_POS_SPRINTS.md)
-- Runbook usuário final: [`docs/como-usar.md`](docs/como-usar.md)
-- Build para Windows: [`docs/build-windows.md`](docs/build-windows.md)
-- QA pós-build: [`docs/checklist-qa.md`](docs/checklist-qa.md)
-- Sprint 3 (Dashboard Exchanges): [`docs/sprint-3/README.md`](docs/sprint-3/README.md)
+## Entregáveis desta consolidação
+- `AUDITORIA_PROJETO.md` (raiz)
+- README atualizado
+- Estrutura de documentação padronizada em `/docs/00..12`
