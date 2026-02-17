@@ -274,6 +274,13 @@ def api_events():
     return jsonify(handlers.get_events())
 
 
+
+@app.route("/api/tenants/<tenantId>/risk/events")
+def api_risk_events(tenantId: str):
+    symbol = request.args.get("symbol", "")
+    limit = int(request.args.get("limit", "50") or 50)
+    return jsonify(handlers.get_risk_events(tenant_id=tenantId, symbol=symbol, limit=limit))
+
 @app.route("/api/tenants/<tenantId>/marketdata/orderbook-status")
 def api_marketdata_orderbook_status(tenantId: str):
     exchange = request.args.get("exchange", "")

@@ -71,6 +71,7 @@ export const api = {
   upsertArbitrageConfig: (data) => request("/api/arbitrage-config", { method: "POST", body: JSON.stringify(data) }),
   getArbitrageStatus: (pair) => request(`/api/arbitrage-status?pair=${encodeURIComponent(pair)}`),
   getConfigLegacy: () => request("/api/config"),
+  getRiskEvents: (tenantId, symbol) => request(`/api/tenants/${encodeURIComponent(tenantId)}/risk/events?symbol=${encodeURIComponent(symbol || "")}`),
 
   getExchangeCredentials: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials`),
   createExchangeCredential: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials`, { method: "POST", body: JSON.stringify(payload) }),

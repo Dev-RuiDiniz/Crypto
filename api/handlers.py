@@ -868,6 +868,56 @@ def update_config(payload: dict):
 
 
 
+
+
+def _ensure_config_pairs_risk_columns(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS config_pairs (
+            symbol TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            strategy TEXT,
+            risk_percentage REAL,
+            max_percent_per_trade REAL,
+            max_absolute_per_trade REAL,
+            max_open_orders_per_symbol INTEGER,
+            max_exposure_per_symbol REAL,
+            kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
+            max_daily_loss REAL,
+            updated_at REAL
+        )
+        """
+    )
+    cols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(config_pairs)").fetchall()}
+    migrations = {
+        "max_percent_per_trade": "ALTER TABLE config_pairs ADD COLUMN max_percent_per_trade REAL",
+        "max_absolute_per_trade": "ALTER TABLE config_pairs ADD COLUMN max_absolute_per_trade REAL",
+        "max_open_orders_per_symbol": "ALTER TABLE config_pairs ADD COLUMN max_open_orders_per_symbol INTEGER",
+        "max_exposure_per_symbol": "ALTER TABLE config_pairs ADD COLUMN max_exposure_per_symbol REAL",
+        "kill_switch_enabled": "ALTER TABLE config_pairs ADD COLUMN kill_switch_enabled INTEGER NOT NULL DEFAULT 0",
+    }
+    for col, ddl in migrations.items():
+        if col not in cols:
+            conn.execute(ddl)
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS risk_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            exchange TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            rule_type TEXT NOT NULL,
+            rule_value REAL,
+            attempted_value REAL,
+            decision TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            client_order_id TEXT,
+            timestamp REAL NOT NULL
+        )
+        """
+    )
+
 def get_bot_configs() -> Dict[str, Any]:
     """Retorna a lista de bot_config por par (tabela config_pairs)."""
     cfg = _load_config()
@@ -878,12 +928,18 @@ def get_bot_configs() -> Dict[str, Any]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_config_pairs_risk_columns(conn)
         rows = conn.execute(
             """
             SELECT
                 symbol,
                 COALESCE(strategy, 'StrategySpread') AS strategy,
                 COALESCE(risk_percentage, 0) AS risk_percentage,
+                COALESCE(max_percent_per_trade, 0) AS max_percent_per_trade,
+                COALESCE(max_absolute_per_trade, 0) AS max_absolute_per_trade,
+                COALESCE(max_open_orders_per_symbol, 0) AS max_open_orders_per_symbol,
+                COALESCE(max_exposure_per_symbol, 0) AS max_exposure_per_symbol,
+                COALESCE(kill_switch_enabled, 0) AS kill_switch_enabled,
                 COALESCE(max_daily_loss, 0) AS max_daily_loss,
                 COALESCE(enabled, 1) AS enabled,
                 COALESCE(updated_at, 0) AS updated_at
@@ -898,6 +954,11 @@ def get_bot_configs() -> Dict[str, Any]:
                     "pair": str(row["symbol"] or "").strip().upper().replace("-", "/"),
                     "strategy": str(row["strategy"] or "StrategySpread"),
                     "risk_percentage": float(row["risk_percentage"] or 0.0),
+                    "max_percent_per_trade": float(row["max_percent_per_trade"] or 0.0),
+                    "max_absolute_per_trade": float(row["max_absolute_per_trade"] or 0.0),
+                    "max_open_orders_per_symbol": int(row["max_open_orders_per_symbol"] or 0),
+                    "max_exposure_per_symbol": float(row["max_exposure_per_symbol"] or 0.0),
+                    "kill_switch_enabled": bool(row["kill_switch_enabled"]),
                     "max_daily_loss": float(row["max_daily_loss"] or 0.0),
                     "enabled": bool(row["enabled"]),
                     "updated_at": float(row["updated_at"] or 0.0),
@@ -917,6 +978,11 @@ def upsert_bot_config(payload: Dict[str, Any]):
     strategy = str(payload.get("strategy") or "StrategySpread").strip() or "StrategySpread"
     risk_percentage = _safe_float(payload.get("risk_percentage"), 0.0)
     max_daily_loss = _safe_float(payload.get("max_daily_loss"), 0.0)
+    max_percent_per_trade = _safe_float(payload.get("max_percent_per_trade"), 0.0)
+    max_absolute_per_trade = _safe_float(payload.get("max_absolute_per_trade"), 0.0)
+    max_open_orders_per_symbol = _safe_int(payload.get("max_open_orders_per_symbol"), 0)
+    max_exposure_per_symbol = _safe_float(payload.get("max_exposure_per_symbol"), 0.0)
+    kill_switch_enabled = _safe_bool(payload.get("kill_switch_enabled"), False)
     enabled = _safe_bool(payload.get("enabled"), True)
     updated_at = time.time()
 
@@ -926,6 +992,7 @@ def upsert_bot_config(payload: Dict[str, Any]):
 
     conn = sqlite3.connect(db_path)
     try:
+        _ensure_config_pairs_risk_columns(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS config_pairs (
@@ -933,6 +1000,11 @@ def upsert_bot_config(payload: Dict[str, Any]):
                 enabled INTEGER NOT NULL DEFAULT 1,
                 strategy TEXT,
                 risk_percentage REAL,
+                max_percent_per_trade REAL,
+                max_absolute_per_trade REAL,
+                max_open_orders_per_symbol INTEGER,
+                max_exposure_per_symbol REAL,
+                kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
                 max_daily_loss REAL,
                 updated_at REAL
             )
@@ -940,12 +1012,18 @@ def upsert_bot_config(payload: Dict[str, Any]):
         )
         conn.execute(
             """
-            INSERT INTO config_pairs(symbol, enabled, strategy, risk_percentage, max_daily_loss, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO config_pairs(symbol, enabled, strategy, risk_percentage, max_percent_per_trade, max_absolute_per_trade,
+                                     max_open_orders_per_symbol, max_exposure_per_symbol, kill_switch_enabled, max_daily_loss, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 enabled=excluded.enabled,
                 strategy=excluded.strategy,
                 risk_percentage=excluded.risk_percentage,
+                max_percent_per_trade=excluded.max_percent_per_trade,
+                max_absolute_per_trade=excluded.max_absolute_per_trade,
+                max_open_orders_per_symbol=excluded.max_open_orders_per_symbol,
+                max_exposure_per_symbol=excluded.max_exposure_per_symbol,
+                kill_switch_enabled=excluded.kill_switch_enabled,
                 max_daily_loss=excluded.max_daily_loss,
                 updated_at=excluded.updated_at
             """,
@@ -954,6 +1032,11 @@ def upsert_bot_config(payload: Dict[str, Any]):
                 1 if enabled else 0,
                 strategy,
                 float(risk_percentage),
+                float(max_percent_per_trade),
+                float(max_absolute_per_trade),
+                int(max_open_orders_per_symbol),
+                float(max_exposure_per_symbol),
+                1 if kill_switch_enabled else 0,
                 float(max_daily_loss),
                 float(updated_at),
             ),
@@ -972,6 +1055,44 @@ def upsert_bot_config(payload: Dict[str, Any]):
     return True, f"bot_config salvo para {pair}. config_version={new_version}"
 
 
+def get_risk_events(tenant_id: str = "default", symbol: str = "", limit: int = 50) -> Dict[str, Any]:
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return {"items": []}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_config_pairs_risk_columns(conn)
+        if symbol:
+            rows = conn.execute(
+                """
+                SELECT id, tenant_id, exchange, symbol, rule_type, rule_value, attempted_value, decision, reason, client_order_id, timestamp
+                FROM risk_events
+                WHERE tenant_id = ? AND UPPER(symbol) = UPPER(?)
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (str(tenant_id or "default"), str(symbol), int(limit)),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, tenant_id, exchange, symbol, rule_type, rule_value, attempted_value, decision, reason, client_order_id, timestamp
+                FROM risk_events
+                WHERE tenant_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (str(tenant_id or "default"), int(limit)),
+            ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    except Exception as exc:
+        return {"items": [], "error": str(exc)}
+    finally:
+        conn.close()
+
+
 def get_arbitrage_config(pair: str, tenant_id: str = "default") -> Dict[str, Any]:
     pair_norm = str(pair or "").strip().upper().replace("-", "/")
     if not pair_norm:
@@ -983,6 +1104,7 @@ def get_arbitrage_config(pair: str, tenant_id: str = "default") -> Dict[str, Any
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_config_pairs_risk_columns(conn)
         row = conn.execute(
             """
             SELECT tenant_id, symbol, enabled, exchange_a, exchange_b,
@@ -1103,6 +1225,7 @@ def get_arbitrage_status(pair: str, tenant_id: str = "default") -> Dict[str, Any
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_config_pairs_risk_columns(conn)
         row = conn.execute(
             """
             SELECT tenant_id, symbol, runtime_state, strategy_lock,
@@ -1144,6 +1267,7 @@ def get_bot_global_config() -> Dict[str, Any]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_config_pairs_risk_columns(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS bot_global_config (
@@ -1348,6 +1472,7 @@ def get_config_status(stale_after_sec: int = 30) -> Dict[str, Any]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_config_pairs_risk_columns(conn)
         db_cfg = _get_config_version_payload(conn)
         out["db_config_version"] = int(db_cfg.get("version") or 0)
         out["db_config_updated_at"] = str(db_cfg.get("updated_at") or "") or None
