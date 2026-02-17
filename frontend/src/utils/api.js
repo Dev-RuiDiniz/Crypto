@@ -1,5 +1,3 @@
-// frontend/src/utils/api.js
-
 const getBaseUrl = () => {
   if (window.env && window.env.API_BASE_URL) {
     return window.env.API_BASE_URL;
@@ -27,10 +25,9 @@ export const api = {
   getBalances: () => request("/api/balances"),
   getOrders: (state) => request(`/api/orders?state=${encodeURIComponent(state)}`),
   getMids: (pair) => request(`/api/mids?pair=${encodeURIComponent(pair)}`),
-  getConfig: () => request("/api/config"),
-  updateConfig: (data) =>
-    request("/api/config", {
-      method: "POST",
-      body: JSON.stringify(data)
-    })
+  getBotConfig: () => request("/api/bot-config"),
+  upsertBotConfig: (data) => request("/api/bot-config", { method: "POST", body: JSON.stringify(data) }),
+  getBotGlobalConfig: () => request("/api/bot-global-config"),
+  updateBotGlobalConfig: (data) => request("/api/bot-global-config", { method: "POST", body: JSON.stringify(data) }),
+  getConfigLegacy: () => request("/api/config")
 };

@@ -10,6 +10,7 @@ import json
 import time
 import os
 import csv
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 import configparser
@@ -143,6 +144,39 @@ class StateStore:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bot_global_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                mode TEXT NOT NULL DEFAULT 'PAPER',
+                loop_interval_ms INTEGER NOT NULL DEFAULT 2000,
+                kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
+                max_positions INTEGER NOT NULL DEFAULT 1,
+                max_daily_loss REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        global_cols = {
+            str(r[1]).lower()
+            for r in cur.execute("PRAGMA table_info(bot_global_config)").fetchall()
+        }
+        if "mode" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN mode TEXT NOT NULL DEFAULT 'PAPER'")
+        if "loop_interval_ms" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN loop_interval_ms INTEGER NOT NULL DEFAULT 2000")
+        if "kill_switch_enabled" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN kill_switch_enabled INTEGER NOT NULL DEFAULT 0")
+        if "max_positions" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN max_positions INTEGER NOT NULL DEFAULT 1")
+        if "max_daily_loss" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN max_daily_loss REAL NOT NULL DEFAULT 0")
+        if "updated_at" not in global_cols:
+            cur.execute("ALTER TABLE bot_global_config ADD COLUMN updated_at TEXT")
+            cur.execute(
+                "UPDATE bot_global_config SET updated_at = ? WHERE COALESCE(updated_at, '') = ''",
+                (datetime.utcnow().isoformat(timespec="seconds") + "Z",),
+            )
         runtime_cols = {
             str(r[1]).lower()
             for r in cur.execute("PRAGMA table_info(runtime_status)").fetchall()
@@ -150,7 +184,82 @@ class StateStore:
         if "id" not in runtime_cols:
             cur.execute("ALTER TABLE runtime_status ADD COLUMN id INTEGER")
             cur.execute("UPDATE runtime_status SET id = 1 WHERE id IS NULL")
+        self.ensure_default_bot_global_config()
         self._conn.commit()
+
+    def ensure_default_bot_global_config(self) -> None:
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO bot_global_config
+            (id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at)
+            VALUES (1, 'PAPER', 2000, 0, 1, 0, ?)
+            """,
+            (now_iso,),
+        )
+
+    def get_bot_global_config(self) -> Dict[str, Any]:
+        self.ensure_default_bot_global_config()
+        row = self._conn.execute(
+            """
+            SELECT id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at
+            FROM bot_global_config
+            WHERE id = 1
+            """
+        ).fetchone()
+        if not row:
+            return {
+                "mode": "PAPER",
+                "loop_interval_ms": 2000,
+                "kill_switch_enabled": False,
+                "max_positions": 1,
+                "max_daily_loss": 0.0,
+                "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            }
+        return {
+            "mode": str(row["mode"] if isinstance(row, sqlite3.Row) else row[1]).upper(),
+            "loop_interval_ms": int((row["loop_interval_ms"] if isinstance(row, sqlite3.Row) else row[2]) or 2000),
+            "kill_switch_enabled": bool((row["kill_switch_enabled"] if isinstance(row, sqlite3.Row) else row[3]) or 0),
+            "max_positions": int((row["max_positions"] if isinstance(row, sqlite3.Row) else row[4]) or 1),
+            "max_daily_loss": float((row["max_daily_loss"] if isinstance(row, sqlite3.Row) else row[5]) or 0.0),
+            "updated_at": str((row["updated_at"] if isinstance(row, sqlite3.Row) else row[6]) or ""),
+        }
+
+    def upsert_bot_global_config(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        current = self.get_bot_global_config()
+        mode = str(payload.get("mode") or current["mode"] or "PAPER").upper().strip()
+        if mode not in ("PAPER", "LIVE"):
+            mode = "PAPER"
+        loop_interval_ms = int(payload.get("loop_interval_ms", current["loop_interval_ms"]))
+        kill_switch_enabled = bool(payload.get("kill_switch_enabled", current["kill_switch_enabled"]))
+        max_positions = int(payload.get("max_positions", current["max_positions"]))
+        max_daily_loss = float(payload.get("max_daily_loss", current["max_daily_loss"]))
+        updated_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+        self._conn.execute(
+            """
+            INSERT INTO bot_global_config
+            (id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                mode=excluded.mode,
+                loop_interval_ms=excluded.loop_interval_ms,
+                kill_switch_enabled=excluded.kill_switch_enabled,
+                max_positions=excluded.max_positions,
+                max_daily_loss=excluded.max_daily_loss,
+                updated_at=excluded.updated_at
+            """,
+            (
+                mode,
+                max(100, loop_interval_ms),
+                1 if kill_switch_enabled else 0,
+                max(1, max_positions),
+                max(0.0, max_daily_loss),
+                updated_at,
+            ),
+        )
+        self._conn.commit()
+        return self.get_bot_global_config()
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:

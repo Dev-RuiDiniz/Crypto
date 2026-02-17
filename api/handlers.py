@@ -816,7 +816,7 @@ def get_bot_configs() -> Dict[str, Any]:
         for row in rows:
             items.append(
                 {
-                    "pair": str(row["symbol"] or ""),
+                    "pair": str(row["symbol"] or "").strip().upper().replace("-", "/"),
                     "strategy": str(row["strategy"] or "StrategySpread"),
                     "risk_percentage": float(row["risk_percentage"] or 0.0),
                     "max_daily_loss": float(row["max_daily_loss"] or 0.0),
@@ -886,6 +886,100 @@ def upsert_bot_config(payload: Dict[str, Any]):
         conn.close()
 
     return True, f"bot_config salvo para {pair}."
+
+
+def get_bot_global_config() -> Dict[str, Any]:
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bot_global_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                mode TEXT NOT NULL DEFAULT 'PAPER',
+                loop_interval_ms INTEGER NOT NULL DEFAULT 2000,
+                kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
+                max_positions INTEGER NOT NULL DEFAULT 1,
+                max_daily_loss REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO bot_global_config
+            (id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at)
+            VALUES (1, 'PAPER', 2000, 0, 1, 0, ?)
+            """,
+            (datetime.utcnow().isoformat(timespec="seconds") + "Z",),
+        )
+        conn.commit()
+        row = conn.execute(
+            """
+            SELECT mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at
+            FROM bot_global_config
+            WHERE id = 1
+            """
+        ).fetchone()
+        return {
+            "mode": str(row["mode"] or "PAPER").upper(),
+            "loop_interval_ms": int(row["loop_interval_ms"] or 2000),
+            "kill_switch_enabled": bool(row["kill_switch_enabled"]),
+            "max_positions": int(row["max_positions"] or 1),
+            "max_daily_loss": float(row["max_daily_loss"] or 0.0),
+            "updated_at": str(row["updated_at"] or ""),
+            "sqlite_path": db_path,
+        }
+    finally:
+        conn.close()
+
+
+def upsert_bot_global_config(payload: Dict[str, Any]):
+    current = get_bot_global_config()
+    mode = str(payload.get("mode") or current["mode"] or "PAPER").upper().strip()
+    if mode not in ("PAPER", "LIVE"):
+        return False, "Campo 'mode' deve ser PAPER ou LIVE."
+
+    loop_interval_ms = max(100, int(_safe_float(payload.get("loop_interval_ms"), current["loop_interval_ms"])))
+    kill_switch_enabled = _safe_bool(payload.get("kill_switch_enabled"), current["kill_switch_enabled"])
+    max_positions = max(1, int(_safe_float(payload.get("max_positions"), current["max_positions"])))
+    max_daily_loss = max(0.0, _safe_float(payload.get("max_daily_loss"), current["max_daily_loss"]))
+
+    db_path = current.get("sqlite_path") or get_effective_db_path()
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO bot_global_config
+            (id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                mode=excluded.mode,
+                loop_interval_ms=excluded.loop_interval_ms,
+                kill_switch_enabled=excluded.kill_switch_enabled,
+                max_positions=excluded.max_positions,
+                max_daily_loss=excluded.max_daily_loss,
+                updated_at=excluded.updated_at
+            """,
+            (
+                mode,
+                loop_interval_ms,
+                1 if kill_switch_enabled else 0,
+                max_positions,
+                max_daily_loss,
+                datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        return False, f"Falha ao salvar bot_global_config: {e}"
+    finally:
+        conn.close()
+
+    return True, "bot_global_config atualizado com sucesso."
 
 def get_db_health() -> Dict[str, Any]:
     db_path = get_effective_db_path()
