@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import logging
+import sqlite3
+import time
 from datetime import datetime
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from typing import Dict, Any, List, Optional
@@ -37,6 +39,20 @@ def _resolve_project_root() -> str:
 # PROJECT_ROOT = C:\...\1ARBIT  (ou pasta do .exe quando empacotado)
 PROJECT_ROOT = _resolve_project_root()
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config.txt")
+
+
+def _resolve_sqlite_path(cfg: Optional[ConfigParser] = None) -> str:
+    cfg = cfg or _load_config()
+    if cfg.has_section("GLOBAL"):
+        gsect = cfg["GLOBAL"]
+    elif cfg.has_section("GENERAL"):
+        gsect = cfg["GENERAL"]
+    else:
+        gsect = {}
+    sqlite_cfg = (gsect.get("SQLITE_PATH", "./data/state.db") or "./data/state.db").strip()
+    if not os.path.isabs(sqlite_cfg):
+        return os.path.normpath(os.path.join(PROJECT_ROOT, sqlite_cfg))
+    return os.path.normpath(sqlite_cfg)
 
 
 # ================== INTEGRAÇÃO COM ESTADO COMPARTILHADO (API ↔ BOT) ==================
@@ -735,6 +751,106 @@ def update_config(payload: dict):
 
 # ================== SNAPSHOT DO BOT (em memória/arquivo) ==================
 
+
+
+
+def get_bot_configs() -> Dict[str, Any]:
+    """Retorna a lista de bot_config por par (tabela config_pairs)."""
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return {"items": [], "sqlite_path": db_path}
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                symbol,
+                COALESCE(strategy, 'StrategySpread') AS strategy,
+                COALESCE(risk_percentage, 0) AS risk_percentage,
+                COALESCE(max_daily_loss, 0) AS max_daily_loss,
+                COALESCE(enabled, 1) AS enabled,
+                COALESCE(updated_at, 0) AS updated_at
+            FROM config_pairs
+            ORDER BY symbol
+            """
+        ).fetchall()
+        items = []
+        for row in rows:
+            items.append(
+                {
+                    "pair": str(row["symbol"] or ""),
+                    "strategy": str(row["strategy"] or "StrategySpread"),
+                    "risk_percentage": float(row["risk_percentage"] or 0.0),
+                    "max_daily_loss": float(row["max_daily_loss"] or 0.0),
+                    "enabled": bool(row["enabled"]),
+                    "updated_at": float(row["updated_at"] or 0.0),
+                }
+            )
+        return {"items": items, "sqlite_path": db_path}
+    finally:
+        conn.close()
+
+
+def upsert_bot_config(payload: Dict[str, Any]):
+    """Cria/atualiza bot_config por par em config_pairs."""
+    pair = str(payload.get("pair") or payload.get("symbol") or "").strip().upper().replace("-", "/")
+    if not pair:
+        return False, "Campo 'pair' é obrigatório."
+
+    strategy = str(payload.get("strategy") or "StrategySpread").strip() or "StrategySpread"
+    risk_percentage = _safe_float(payload.get("risk_percentage"), 0.0)
+    max_daily_loss = _safe_float(payload.get("max_daily_loss"), 0.0)
+    enabled = _safe_bool(payload.get("enabled"), True)
+    updated_at = time.time()
+
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS config_pairs (
+                symbol TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                strategy TEXT,
+                risk_percentage REAL,
+                max_daily_loss REAL,
+                updated_at REAL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO config_pairs(symbol, enabled, strategy, risk_percentage, max_daily_loss, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                enabled=excluded.enabled,
+                strategy=excluded.strategy,
+                risk_percentage=excluded.risk_percentage,
+                max_daily_loss=excluded.max_daily_loss,
+                updated_at=excluded.updated_at
+            """,
+            (
+                pair,
+                1 if enabled else 0,
+                strategy,
+                float(risk_percentage),
+                float(max_daily_loss),
+                float(updated_at),
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        return False, f"Falha ao salvar bot_config: {e}"
+    finally:
+        conn.close()
+
+    return True, f"bot_config salvo para {pair}."
 
 def debug_snapshot() -> Dict[str, Any]:
     """
