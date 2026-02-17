@@ -115,6 +115,22 @@ class StateStore:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS paper_orders (
+                id TEXT PRIMARY KEY,
+                ts REAL,
+                pair TEXT,
+                strategy TEXT,
+                side TEXT,
+                risk_percentage REAL,
+                qty REAL,
+                notional_usdt REAL,
+                cycle_id TEXT,
+                payload TEXT
+            )
+            """
+        )
         self._conn.commit()
 
     @staticmethod
@@ -315,6 +331,33 @@ class StateStore:
                     ])
             except Exception as e:
                 log.warning(f"[orders.csv] falha: {e}")
+
+    def record_paper_order(self, payload: Dict[str, Any]) -> None:
+        ts = time.time()
+        oid = str(payload.get("id") or f"paper_{int(ts * 1000)}")
+        try:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO paper_orders
+                (id, ts, pair, strategy, side, risk_percentage, qty, notional_usdt, cycle_id, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    oid,
+                    ts,
+                    str(payload.get("pair") or ""),
+                    str(payload.get("strategy") or ""),
+                    str(payload.get("side") or ""),
+                    float(payload.get("risk_percentage") or 0.0),
+                    float(payload.get("qty") or 0.0),
+                    float(payload.get("computed_notional") or 0.0),
+                    str(payload.get("cycle_id") or ""),
+                    json.dumps(payload, ensure_ascii=False),
+                ),
+            )
+            self._conn.commit()
+        except Exception as e:
+            log.warning(f"[paper_orders] falha: {e}")
 
     def record_fill(self, data: Dict[str, Any]) -> None:
         """
