@@ -6,9 +6,10 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, request, send_from_directory, abort
+from flask import Flask, jsonify, request, send_from_directory, abort, g
 
 from app.version import APP_VERSION
+from api.exchange_credentials_api import exchange_credentials_bp
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, "static")
 STATIC_DIR = STATIC_DIR if os.path.isdir(STATIC_DIR) else None
 
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static" if STATIC_DIR else None)
+app.register_blueprint(exchange_credentials_bp)
 
 
 def _safe_send(base_dir: str, filename: str):
@@ -141,6 +143,24 @@ def frontend_files(filename: str):
     return (f"Arquivo não encontrado no frontend: {filename}\nFRONTEND_DIR: {FRONTEND_DIR}\n", 404)
 
 
+
+
+
+@app.before_request
+def attach_correlation_id():
+    cid = (request.headers.get("X-Correlation-Id") or "").strip()
+    if not cid:
+        cid = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    g.correlation_id = cid
+    g.db_path = handlers.get_effective_db_path()
+
+
+@app.after_request
+def add_correlation_id_header(response):
+    correlation_id = getattr(g, "correlation_id", "")
+    if correlation_id:
+        response.headers["X-Correlation-Id"] = correlation_id
+    return response
 
 @app.route("/api/open-logs", methods=["POST"])
 def api_open_logs():
@@ -235,6 +255,17 @@ def api_debug():
 def api_events():
     return jsonify(handlers.get_events())
 
+
+
+
+@app.errorhandler(500)
+def on_internal_error(_):
+    return jsonify({
+        "error": "INTERNAL_ERROR",
+        "message": "Unexpected error",
+        "details": [],
+        "correlationId": getattr(g, "correlation_id", ""),
+    }), 500
 
 def main(host: str = "127.0.0.1", port: int = 8000, db_path: Optional[str] = None):
     if db_path:
