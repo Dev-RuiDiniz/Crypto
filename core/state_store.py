@@ -56,10 +56,24 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS config_pairs (
                 symbol TEXT PRIMARY KEY,
                 enabled INTEGER NOT NULL DEFAULT 1,
+                strategy TEXT,
+                risk_percentage REAL,
+                max_daily_loss REAL,
                 updated_at REAL
             )
             """
         )
+        # Migração mínima para bancos existentes: adiciona colunas de bot_config se faltarem.
+        existing_cols = {
+            str(r[1]).lower()
+            for r in cur.execute("PRAGMA table_info(config_pairs)").fetchall()
+        }
+        if "strategy" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN strategy TEXT")
+        if "risk_percentage" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN risk_percentage REAL")
+        if "max_daily_loss" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN max_daily_loss REAL")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS orders (
@@ -135,6 +149,45 @@ class StateStore:
             normalized = self._normalize_symbol(str(row["symbol"] if isinstance(row, sqlite3.Row) else row[0]))
             if normalized:
                 out.append(normalized)
+        return out
+
+    def get_enabled_bot_configs(self) -> List[Dict[str, Any]]:
+        """
+        Retorna bot_config habilitados no formato esperado pelo executor.
+        """
+        try:
+            rows = self._conn.execute(
+                """
+                SELECT
+                    symbol,
+                    COALESCE(strategy, 'StrategySpread') AS strategy,
+                    COALESCE(risk_percentage, 0) AS risk_percentage,
+                    COALESCE(max_daily_loss, 0) AS max_daily_loss,
+                    COALESCE(enabled, 1) AS enabled
+                FROM config_pairs
+                WHERE COALESCE(enabled, 1) = 1
+                ORDER BY symbol
+                """
+            ).fetchall()
+        except Exception as e:
+            log.warning(f"[config_pairs] leitura de bot_config falhou: {e}")
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            raw_pair = str(row["symbol"] if isinstance(row, sqlite3.Row) else row[0])
+            pair = self._normalize_symbol(raw_pair)
+            if not pair:
+                continue
+            out.append(
+                {
+                    "pair": pair,
+                    "strategy": str((row["strategy"] if isinstance(row, sqlite3.Row) else row[1]) or "StrategySpread"),
+                    "risk_percentage": float((row["risk_percentage"] if isinstance(row, sqlite3.Row) else row[2]) or 0.0),
+                    "max_daily_loss": float((row["max_daily_loss"] if isinstance(row, sqlite3.Row) else row[3]) or 0.0),
+                    "enabled": bool((row["enabled"] if isinstance(row, sqlite3.Row) else row[4]) or 0),
+                }
+            )
         return out
 
     def _ensure_csv_headers(self):
