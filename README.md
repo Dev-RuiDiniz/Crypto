@@ -14,7 +14,8 @@ O **ARBIT** é um bot de trading spot com:
 
 ### Suporte atual do cliente
 - **Multi-pair simultâneo**: suportado (loop por par no mesmo ciclo).
-- **Config por par (`risk_percentage`) sem restart**: suportado no worker com recarga periódica de `config_pairs`.
+- **Config por par (`risk_percentage`) sem restart**: suportado no worker com recarga periódica de `config_pairs` (respeitando `BOT_CONFIG_CACHE_TTL_SEC`).
+- **Observação importante**: o CRUD de `config_pairs` está disponível por API (`/api/bot-config`). O dashboard web atual não possui tela dedicada para editar `config_pairs`.
 
 ---
 
@@ -217,11 +218,26 @@ Critérios validados na suíte:
 
 - **Por API (recomendado):** `POST /api/bot-config`.
 - **Direto no banco:** tabela `config_pairs` em `data/state.db`.
-- **Config base/legado:** `config.txt` (`[PAIRS]`, `[SPREAD]`, `[STAKE]`, `[ROUTER]`).
+- **Config base/legado (via dashboard atual):** `config.txt` (`[PAIRS]`, `[SPREAD]`, `[STAKE]`, `[ROUTER]`) através de `GET/POST /api/config`.
 
 ---
 
-## 9) Documentação complementar
+## 9) Limitações atuais e como validar
+
+- **Dashboard x `config_pairs`:** o frontend atual não possui CRUD visual de `config_pairs`; use `GET/POST /api/bot-config` (curl/Postman/cliente HTTP).
+- **Isolamento por par:** o loop é multi-pair, porém o tratamento de erro do ciclo ainda é amplo; falha não tratada em um par pode interromper os demais no ciclo corrente.
+- **Propagação de `risk_percentage`:** alterações refletem sem restart, mas após o TTL (`GLOBAL.BOT_CONFIG_CACHE_TTL_SEC`) e o próximo ciclo do worker.
+- **Consistência de SQLite:** garanta que API e worker apontem para o mesmo `GLOBAL.SQLITE_PATH` absoluto para evitar escrita/leitura em bancos distintos.
+
+### Como validar rapidamente
+
+1. Atualize `risk_percentage` via `POST /api/bot-config`.
+2. Consulte `GET /api/bot-config` e confirme o `sqlite_path` retornado.
+3. Verifique no log do worker as linhas `[config_reload]` e `[position_sizing]` para o par alterado.
+
+---
+
+## 10) Documentação complementar
 
 - `docs/auditoria-solicitacao-cliente.md` — auditoria completa da solicitação do cliente.
 - `docs/tests-paper-multipair.md` — referência dos testes paper multi-pair.
