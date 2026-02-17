@@ -371,6 +371,47 @@ class OrderRouter:
 
         return float(amount)
 
+
+    def _record_paper_execution(
+        self,
+        *,
+        pair: str,
+        side: str,
+        qty: float,
+        price_usdt: float,
+        risk_percentage: float,
+        strategy: str = "",
+    ) -> None:
+        cycle_id = f"{pair}:{int(time.time() * 1000)}"
+        payload = {
+            "id": f"paper_{cycle_id}_{side}",
+            "timestamp": time.time(),
+            "pair": pair,
+            "strategy": strategy,
+            "side": side,
+            "risk_percentage": float(risk_percentage or 0.0),
+            "qty": float(qty or 0.0),
+            "computed_notional": float(qty or 0.0) * float(price_usdt or 0.0),
+            "cycle_id": cycle_id,
+        }
+        log.info(
+            "[paper_exec] pair=%s strategy=%s side=%s risk_percentage=%.4f qty=%.8f notional=%.8f cycle_id=%s",
+            payload["pair"],
+            payload["strategy"] or "n/a",
+            payload["side"],
+            payload["risk_percentage"],
+            payload["qty"],
+            payload["computed_notional"],
+            payload["cycle_id"],
+        )
+        try:
+            if hasattr(self.state, "record_paper_order"):
+                self.state.record_paper_order(payload)
+            if hasattr(self.state, "log_event"):
+                self.state.log_event("paper_exec", payload)
+        except Exception:
+            pass
+
     # ------------------------- núcleo: reprecificação por exchange -------------------------
 
     def _band_hit(self, pair: str, ex_name: str, side: str, new_price_local: float) -> bool:
@@ -785,6 +826,15 @@ class OrderRouter:
                 return
 
             oid = order.get("id") or order.get("orderId") or "?"
+
+            if bool((order.get("info") or {}).get("paper")):
+                self._record_paper_execution(
+                    pair=pair,
+                    side=side_l,
+                    qty=float(qty_local),
+                    price_usdt=float(price_usdt),
+                    risk_percentage=float(risk_percentage or 0.0),
+                )
 
             base_ccy, quote_ccy = symbol_local.split("/")
             money = "R$" if quote_ccy.upper() == "BRL" else "$"
