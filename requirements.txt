@@ -5,6 +5,9 @@ ccxt==4.3.92
 aiohttp==3.10.8
 tenacity==8.2.3
 
+# API
+Flask==3.0.3
+
 # Utilidades
 pytz==2024.2
 colorama==0.4.6

@@ -26,12 +26,17 @@ ulog = get_user_logger(APP_NAME)   # humano  -> console
 
 # ---------------- CLI / Config ----------------
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="ARBIT - Bot de arbitragem multi-exchanges")
-    p.add_argument("config", nargs="?", default="config.txt",
+    p.add_argument("config", nargs="?", default=None,
+                   help="Caminho do arquivo INI (compatibilidade legada)")
+    p.add_argument("--config", dest="config_flag", default=None,
                    help="Caminho do arquivo INI (padrão: ./config.txt)")
     p.add_argument("--db-path", default=None, help="Sobrescreve SQLITE_PATH")
-    return p.parse_args()
+    p.add_argument("--run-worker", action="store_true", help=argparse.SUPPRESS)
+    args = p.parse_args(argv)
+    args.config = args.config_flag or args.config or "config.txt"
+    return args
 
 
 def load_config(path: str) -> configparser.ConfigParser:
