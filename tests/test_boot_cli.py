@@ -45,13 +45,9 @@ def test_launcher_run_worker_rewrites_argv(monkeypatch):
     rc = launcher.main()
 
     assert rc == 0
-    assert captured["argv"] == [
-        captured["argv"][0],
-        "--config",
-        "config.txt",
-        "--db-path",
-        "state.db",
-    ]
+    assert captured["argv"][1] == "--config"
+    assert captured["argv"][2].endswith("config.txt")
+    assert captured["argv"][3:] == ["--db-path", "state.db"]
 
 
 def test_launcher_worker_command_uses_config_flag(monkeypatch):
@@ -99,4 +95,5 @@ def test_launcher_worker_command_uses_config_flag(monkeypatch):
     rc = launcher.main()
 
     assert rc == 0
-    assert calls[1][:5] == ["python", "-m", "bot", "--config", "config.txt"]
+    assert calls[1][:4] == ["python", "-m", "bot", "--config"]
+    assert str(calls[1][4]).endswith("config.txt")

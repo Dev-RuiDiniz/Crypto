@@ -20,6 +20,8 @@ from typing import Dict, Any, List, Optional
 from utils.logger import configure_logging, get_logger, get_user_logger
 from app.pathing import ConfigResolutionError, get_work_dir, resolve_config_path
 from app.version import APP_VERSION
+from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
+from core.audit_log_service import AuditLogService
 
 APP_NAME = "ARBIT"
 log = get_logger(APP_NAME)         # técnico -> arquivo detalhado
@@ -323,14 +325,25 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         ulog.error("❌ Falha ao carregar componentes do bot. Verifique logs detalhados.")
         raise
 
+    # Inicializa store cedo para garantir schema/migrations locais antes de acessar cofre
+    state = StateStore(cfg)
+
     # Instâncias principais
-    ex_hub = ExchangeHub(cfg)
+    tenant_id = (os.getenv("TRADINGBOT_TENANT_ID", "") or cfg.get("GLOBAL", "TENANT_ID", fallback="default")).strip() or "default"
+    credentials_service = ExchangeCredentialsService(cfg)
+    _ = AuditLogService(cfg)
+    ex_hub = ExchangeHub(cfg, credentials_service=credentials_service, tenant_id=tenant_id)
     try:
         await ex_hub.connect_all()
+    except CredentialsNotFoundError as e:
+        log.error("Falha de credenciais (tenant=%s): %s", tenant_id, e)
+        ulog.error("❌ Credenciais de exchange não encontradas no cofre para o tenant atual.")
+        ulog.error("   Cadastre credenciais ativas em exchange_credentials e reinicie o worker.")
+        raise
     except Exception as e:
         log.error(f"Falha ao conectar exchanges: {e}", exc_info=True)
         ulog.error("❌ Falha ao conectar às corretoras. Verifique:")
-        ulog.error("  1. Credenciais de API no config.txt")
+        ulog.error("  1. Credenciais de API no cofre (tabela exchange_credentials)")
         ulog.error("  2. Conexão com a internet")
         ulog.error("  3. Se as exchanges estão funcionando")
         raise
@@ -448,7 +461,6 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         strategy = StrategySpread(cfg)
         portfolio = Portfolio(cfg, ex_hub)
         risk = RiskManager(cfg)
-        state = StateStore(cfg)
         router = OrderRouter(cfg, ex_hub, portfolio, risk, state)
         order_manager = OrderManager(cfg, ex_hub, state, risk)
         monitor = MainMonitor(cfg, ex_hub, strategy, router, order_manager, portfolio, state, risk)

@@ -1,3 +1,7 @@
+; TEMPLATE LEGADO - NÃO PREENCHER EM PROD
+; Em produção use variáveis de ambiente e/ou cofre de credenciais no banco (exchange_credentials).
+; config.txt NÃO é mais fonte de verdade para credenciais de exchange do worker.
+
 [GLOBAL]
 mode = REAL
 usdt_brl_rate = 5.43
