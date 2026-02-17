@@ -162,11 +162,30 @@ class MainMonitor:
         raw_pairs = self.cfg.get("PAIRS", "LIST", fallback="")
         cfg_pairs: List[str] = [p.strip().upper() for p in raw_pairs.split(",") if p.strip()]
         db_pairs: List[str] = []
+        self.bot_configs: Dict[str, Dict[str, Any]] = {}
         if hasattr(self.state, "get_enabled_pairs"):
             try:
                 db_pairs = [p.strip().upper() for p in (self.state.get_enabled_pairs() or []) if p]
             except Exception as e:
                 log.warning(f"[config_pairs] falha ao carregar pares do banco: {e}")
+
+        # bot_config persistido: pair/strategy/risk_percentage/max_daily_loss/enabled.
+        if hasattr(self.state, "get_enabled_bot_configs"):
+            try:
+                for item in self.state.get_enabled_bot_configs() or []:
+                    pair = str(item.get("pair") or "").strip().upper()
+                    if not pair:
+                        continue
+                    self.bot_configs[pair] = {
+                        "pair": pair,
+                        "strategy": str(item.get("strategy") or "StrategySpread"),
+                        "risk_percentage": float(item.get("risk_percentage") or 0.0),
+                        "max_daily_loss": float(item.get("max_daily_loss") or 0.0),
+                        "enabled": bool(item.get("enabled", True)),
+                    }
+                db_pairs = list(dict.fromkeys(db_pairs + list(self.bot_configs.keys())))
+            except Exception as e:
+                log.warning(f"[config_pairs] falha ao carregar bot_config do banco: {e}")
 
         # Mantém pares do config e adiciona pares persistidos no banco sem duplicar.
         self.pairs: List[str] = list(dict.fromkeys(cfg_pairs + db_pairs))
@@ -1064,10 +1083,23 @@ class MainMonitor:
 
                 try:
                     for pair in self.pairs:
+                        pair_cfg = self.bot_configs.get(pair, {})
+                        if pair_cfg and not bool(pair_cfg.get("enabled", True)):
+                            log.info(f"[ExecutionEngine] {pair} desabilitado em bot_config. Ignorando.")
+                            continue
+
                         strategy_name = self.strategy.__class__.__name__
+                        cfg_strategy = str(pair_cfg.get("strategy") or strategy_name)
+                        if pair_cfg and cfg_strategy.lower() not in (strategy_name.lower(), self.strategy.__class__.__name__.lower()):
+                            log.info(
+                                f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, "
+                                f"mas runtime atual={strategy_name}. Ignorando par."
+                            )
+                            continue
+
                         log.info(
                             f"[ExecutionEngine] {datetime.utcnow().isoformat()}Z - "
-                            f"Symbol: {pair} - Strategy: {strategy_name}"
+                            f"Symbol: {pair} - Strategy: {cfg_strategy}"
                         )
                         mids = await self._mid_per_exchange(pair)
                         mids_map[pair] = mids
@@ -1098,6 +1130,8 @@ class MainMonitor:
                             buy_target_usdt=float(buy_tgt),
                             sell_target_usdt=float(sell_tgt),
                             min_notional_usdt=self.min_notional_usdt,
+                            risk_percentage=float(pair_cfg.get("risk_percentage") or 0.0),
+                            max_daily_loss=float(pair_cfg.get("max_daily_loss") or 0.0),
                         )
 
                     self._render_panel(ref_map, mids_map)

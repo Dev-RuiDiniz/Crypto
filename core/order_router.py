@@ -318,6 +318,8 @@ class OrderRouter:
         side: str,
         target_usdt: float,
         pair: str,
+        risk_percentage: float = 0.0,
+        max_daily_loss: float = 0.0,
     ) -> float:
         side_l = str(side).lower()
         mode, value = self._stake_for(pair)
@@ -332,10 +334,16 @@ class OrderRouter:
 
         if mode == "FIXO_USDT":
             notional_usdt = max(0.0, float(value))
+            # bot_config.risk_percentage: limite adicional por operação.
+            risk_frac = max(0.0, min(1.0, float(risk_percentage) / 100.0)) if risk_percentage > 0 else 0.0
             if side_l == "buy":
                 q_free = await self._quote_free(ex, quote, ex_name=ex_name)
                 q_usdt = (float(q_free) / float(self.ex_hub.usdt_brl)) if quote == "BRL" else float(q_free)
                 notional_usdt = min(notional_usdt, q_usdt)
+                if risk_frac > 0:
+                    notional_usdt = min(notional_usdt, q_usdt * risk_frac)
+                if max_daily_loss > 0:
+                    notional_usdt = min(notional_usdt, float(max_daily_loss))
                 if price_usdt > 0:
                     amount = notional_usdt / price_usdt
             else:
@@ -343,12 +351,18 @@ class OrderRouter:
                     amount = notional_usdt / price_usdt
                 b_free = await self._base_free(ex, base, ex_name=ex_name)
                 amount = min(amount, float(b_free))
+                if risk_frac > 0:
+                    amount = min(amount, float(b_free) * risk_frac)
         else:
             pct = max(0.0, min(1.0, float(value)))
+            if risk_percentage > 0:
+                pct = min(pct, max(0.0, min(1.0, float(risk_percentage) / 100.0)))
             if side_l == "buy":
                 q_free = await self._quote_free(ex, quote, ex_name=ex_name)
                 q_usdt = (float(q_free) / float(self.ex_hub.usdt_brl)) if quote == "BRL" else float(q_free)
                 notional_usdt = q_usdt * pct
+                if max_daily_loss > 0:
+                    notional_usdt = min(notional_usdt, float(max_daily_loss))
                 if price_usdt > 0:
                     amount = notional_usdt / price_usdt
             else:
@@ -662,6 +676,8 @@ class OrderRouter:
         price_usdt: float,
         pair: str,
         min_notional_usdt: float,
+        risk_percentage: float = 0.0,
+        max_daily_loss: float = 0.0,
         amount_override: Optional[float] = None,
         cancel_before: bool = True,
     ):
@@ -690,7 +706,15 @@ class OrderRouter:
             return
 
         if amount_override is None:
-            amount_raw = await self._calc_amount(ex_name, symbol_local, side_l, price_usdt, pair)
+            amount_raw = await self._calc_amount(
+                ex_name,
+                symbol_local,
+                side_l,
+                price_usdt,
+                pair,
+                risk_percentage=float(risk_percentage or 0.0),
+                max_daily_loss=float(max_daily_loss or 0.0),
+            )
         else:
             amount_raw = float(amount_override)
 
@@ -828,7 +852,15 @@ class OrderRouter:
 
     # ------------------------- API pública -------------------------
 
-    async def _reprice_side_local(self, pair: str, ex_name: str, side: str, spread: float):
+    async def _reprice_side_local(
+        self,
+        pair: str,
+        ex_name: str,
+        side: str,
+        spread: float,
+        risk_percentage: float = 0.0,
+        max_daily_loss: float = 0.0,
+    ):
         symbol_local = self.ex_hub.resolve_symbol_local(ex_name, side.upper(), pair)
         if not symbol_local:
             return
@@ -850,6 +882,8 @@ class OrderRouter:
                 price_usdt=float(target_u),
                 pair=pair,
                 min_notional_usdt=float(self.min_router_notional),
+                risk_percentage=float(risk_percentage or 0.0),
+                max_daily_loss=float(max_daily_loss or 0.0),
             )
         else:
             bid_u = await self._best_bid_usdt(ex_name, symbol_local)
@@ -868,6 +902,8 @@ class OrderRouter:
                 price_usdt=float(target_u),
                 pair=pair,
                 min_notional_usdt=float(self.min_router_notional),
+                risk_percentage=float(risk_percentage or 0.0),
+                max_daily_loss=float(max_daily_loss or 0.0),
             )
 
     async def reprice_pair(
@@ -877,15 +913,31 @@ class OrderRouter:
         buy_target_usdt: float,
         sell_target_usdt: float,
         min_notional_usdt: float = 0.0,
+        risk_percentage: float = 0.0,
+        max_daily_loss: float = 0.0,
     ):
         if self.anchor_mode == "LOCAL":
             buy_spread, sell_spread = self._pair_spreads(pair)
             log.info(f"[{pair}] reprice(LOCAL): spreads buy={buy_spread:.4f} sell={sell_spread:.4f}")
 
             for ex_name in self.ex_hub.enabled_ids:
-                await self._reprice_side_local(pair, ex_name, "buy", buy_spread)
+                await self._reprice_side_local(
+                    pair,
+                    ex_name,
+                    "buy",
+                    buy_spread,
+                    risk_percentage=float(risk_percentage or 0.0),
+                    max_daily_loss=float(max_daily_loss or 0.0),
+                )
                 if self.place_both_sides_per_ex:
-                    await self._reprice_side_local(pair, ex_name, "sell", sell_spread)
+                    await self._reprice_side_local(
+                        pair,
+                        ex_name,
+                        "sell",
+                        sell_spread,
+                        risk_percentage=float(risk_percentage or 0.0),
+                        max_daily_loss=float(max_daily_loss or 0.0),
+                    )
             return
 
         # ---- Comportamento legado (REF) ----
@@ -902,6 +954,8 @@ class OrderRouter:
                 ex_name=ex_name, symbol_local=symbol_local, side="buy",
                 price_usdt=float(buy_target_usdt), pair=pair,
                 min_notional_usdt=float(min_notional_usdt or self.min_router_notional),
+                risk_percentage=float(risk_percentage or 0.0),
+                max_daily_loss=float(max_daily_loss or 0.0),
             )
         else:
             log.warning(f"[{pair}] BUY: nenhuma exchange com saldo suficiente.")
@@ -917,6 +971,8 @@ class OrderRouter:
                 ex_name=ex_name, symbol_local=symbol_local, side="sell",
                 price_usdt=float(sell_target_usdt), pair=pair,
                 min_notional_usdt=float(min_notional_usdt or self.min_router_notional),
+                risk_percentage=float(risk_percentage or 0.0),
+                max_daily_loss=float(max_daily_loss or 0.0),
             )
         else:
             log.warning(f"[{pair}] SELL: nenhuma exchange com saldo suficiente.")
