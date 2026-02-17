@@ -30,6 +30,8 @@ except Exception:
 # Adapter MB v4 (privadas)
 from .adapters import MBV4Adapter
 from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
+from core.credential_provider import CredentialProvider
+from core.exchange_client_manager import ExchangeClientFactory, ExchangeClientManager
 
 log = get_logger("exchanges")
 
@@ -118,6 +120,14 @@ class ExchangeHub:
         
         self.enabled_ids: List[str] = self._discover_enabled()
         self.exchanges: Dict[str, ccxt.Exchange] = {}
+        self.credential_provider = CredentialProvider(self.credentials_service)
+        self.client_factory = ExchangeClientFactory(self.http_timeout)
+        self.client_manager = ExchangeClientManager(
+            tenant_id=self.tenant_id,
+            provider=self.credential_provider,
+            service=self.credentials_service,
+            factory=self.client_factory,
+        )
         self._markets_loaded: Dict[str, bool] = {}
         self.symbol_map = self._build_symbol_map()
 
@@ -262,16 +272,17 @@ class ExchangeHub:
 
     async def connect_all(self):
         for ex_name in self.enabled_ids:
-            ex = await self._instantiate_exchange(ex_name)
-            if ex is None:
-                log.error(f"[{ex_name}] não foi possível instanciar a exchange (verifique id/versão no CCXT).")
-                continue
-            self.exchanges[ex_name] = ex
+            await self.ensure_client_ready(ex_name)
 
         await asyncio.gather(*[
             self._safe_load_markets(ex_name)
             for ex_name in self.exchanges.keys()
         ])
+
+    async def ensure_client_ready(self, ex_name: str):
+        entry = await self.client_manager.ensure_client(ex_name)
+        self.exchanges[ex_name] = entry.client
+        return entry.client
 
     async def _instantiate_exchange(self, ex_name: str) -> Optional[ccxt.Exchange]:
         try:
@@ -463,7 +474,7 @@ class ExchangeHub:
         return summary
 
     async def _safe_load_markets(self, ex_name: str):
-        ex = self.exchanges[ex_name]
+        ex = await self.ensure_client_ready(ex_name)
         if self._markets_loaded.get(ex_name):
             return
         try:
@@ -574,8 +585,10 @@ class ExchangeHub:
             return await ex.fetch_balance()
         try:
             bal = await _do()
+            self.client_manager.mark_resumed_if_applicable(ex_name)
             return bal or {}
         except Exception as e:
+            await self.client_manager.mark_auth_failed_and_pause(ex_name, e)
             log.warning(f"[{ex_name}] fetch_balance falhou: {e}")
             return {}
 
@@ -653,12 +666,20 @@ class ExchangeHub:
                 raise
 
         # Outras via CCXT
-        ex = self.exchanges[ex_name]
-        deco = _get_retry_deco(self.max_retries, self.retry_backoff_ms)
-        @deco
-        async def _do() -> Dict[str, Any]:
-            return await ex.create_order(symbol_local, "limit", side, amount, price_local, params)
-        return await _do()
+        async def _call(ex):
+            deco = _get_retry_deco(self.max_retries, self.retry_backoff_ms)
+
+            @deco
+            async def _do() -> Dict[str, Any]:
+                return await ex.create_order(symbol_local, "limit", side, amount, price_local, params)
+
+            return await _do()
+
+        try:
+            return await self.client_manager.run_with_operation_lock(ex_name, _call)
+        except Exception as e:
+            await self.client_manager.mark_auth_failed_and_pause(ex_name, e)
+            raise
 
     async def cancel_order(
         self,
@@ -691,16 +712,23 @@ class ExchangeHub:
                 raise
 
         # Outras via CCXT
-        ex = self.exchanges[ex_name]
-        deco = _get_retry_deco(self.max_retries, self.retry_backoff_ms)
-        @deco
-        async def _do():
-            try:
-                return await ex.cancel_order(order_id, symbol_local, params)
-            except Exception:
-                # algumas exchanges aceitam None para symbol
-                return await ex.cancel_order(order_id, None, params)
-        return await _do()
+        async def _call(ex):
+            deco = _get_retry_deco(self.max_retries, self.retry_backoff_ms)
+
+            @deco
+            async def _do():
+                try:
+                    return await ex.cancel_order(order_id, symbol_local, params)
+                except Exception:
+                    return await ex.cancel_order(order_id, None, params)
+
+            return await _do()
+
+        try:
+            return await self.client_manager.run_with_operation_lock(ex_name, _call)
+        except Exception as e:
+            await self.client_manager.mark_auth_failed_and_pause(ex_name, e)
+            raise
 
     async def fetch_open_orders(
         self,
@@ -757,7 +785,14 @@ class ExchangeHub:
                 return []
 
         # Outras via CCXT
-        return await self._fetch_open_orders_ccxt(ex_name, global_pair, side_hint, params)
+        try:
+            await self.ensure_client_ready(ex_name)
+            out = await self._fetch_open_orders_ccxt(ex_name, global_pair, side_hint, params)
+            self.client_manager.mark_resumed_if_applicable(ex_name)
+            return out
+        except Exception as e:
+            await self.client_manager.mark_auth_failed_and_pause(ex_name, e)
+            raise
 
     async def _fetch_open_orders_ccxt(
         self,

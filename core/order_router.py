@@ -84,6 +84,9 @@ class OrderRouter:
         self._alert_last_ts: Dict[Tuple[str, str, str], float] = {}
 
         self._should_exit = False
+        self._recent_order_hashes: Dict[str, float] = {}
+        self._order_hash_ttl_sec = float(self.cfg.get("ROUTER", "ORDER_HASH_TTL_SEC", fallback="8"))
+
 
     # ------------------------- eventos / integração com painel -------------------------
 
@@ -677,6 +680,23 @@ class OrderRouter:
         sec = self.cfg.get(sect, "API_SECRET", fallback="").strip()
         return bool(api and sec)
 
+    def _build_client_order_id(self, ex_name: str, pair: str, side_l: str, symbol_local: str) -> str:
+        bucket = int(time.time() // 5)
+        tenant = str(getattr(self.ex_hub, "tenant_id", "default"))
+        raw = f"{tenant}:{ex_name}:{pair}:{symbol_local}:{side_l}:{bucket}"
+        return raw.replace("/", "-").replace(":", "-")[:48]
+
+    def _is_duplicate_submit(self, key: str) -> bool:
+        now = time.time()
+        expired = [k for k, ts in self._recent_order_hashes.items() if now - ts > self._order_hash_ttl_sec]
+        for k in expired:
+            self._recent_order_hashes.pop(k, None)
+        prev = self._recent_order_hashes.get(key)
+        if prev and (now - prev) <= self._order_hash_ttl_sec:
+            return True
+        self._recent_order_hashes[key] = now
+        return False
+
     async def _create_limit_order_safe(
         self,
         ex_name: str,
@@ -694,12 +714,18 @@ class OrderRouter:
         # 1) SEMPRE tentar via hub primeiro (MB v4 e afins) - CORRIGIDO
         try:
             if hasattr(self.ex_hub, "create_limit_order"):
+                client_order_id = self._build_client_order_id(ex_name, pair, side_l, symbol_local)
+                submit_hash = f"{ex_name}:{pair}:{symbol_local}:{side_l}:{round(float(qty_local), 8)}:{round(float(price_usdt), 8)}:{client_order_id}"
+                if self._is_duplicate_submit(submit_hash):
+                    log.warning(f"[{pair}] duplicate submit prevented ex={ex_name} side={side_l} symbol={symbol_local}")
+                    return {}
                 return await self.ex_hub.create_limit_order(
                     ex_name=ex_name,
                     global_pair=pair,
                     side=side_l,
                     amount=float(qty_local),
                     price_usdt=float(price_usdt),
+                    params={"clientOrderId": client_order_id},
                 )
         except Exception as e:
             msg = str(e)
