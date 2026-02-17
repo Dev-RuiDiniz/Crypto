@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
+import socket
 import sys
 import time
 import urllib.error
@@ -22,6 +24,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Host local da API")
     parser.add_argument("--config", default="config.txt", help="Arquivo config.txt legado")
     parser.add_argument("--no-browser", action="store_true", help="Não abrir navegador automaticamente")
+    parser.add_argument("--open-logs", action="store_true", help="Abre a pasta de logs no Explorer e sai")
+    parser.add_argument("--db-path", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--run-api", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--run-worker", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
@@ -55,8 +61,44 @@ def _wait_api_ready(base_url: str, timeout_sec: float, logger: logging.Logger) -
     raise TimeoutError("API healthcheck timeout")
 
 
+def _is_port_available(host: str, port: int) -> bool:
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        sock.settimeout(0.25)
+        return sock.connect_ex((host, port)) != 0
+
+
+def _resolve_port(host: str, preferred_port: int, logger: logging.Logger) -> int:
+    if _is_port_available(host, preferred_port):
+        return preferred_port
+    logger.warning("Porta %s ocupada. Buscando alternativa no range 5000-5100.", preferred_port)
+    for port in range(5000, 5101):
+        if _is_port_available(host, port):
+            logger.info("Porta alternativa selecionada: %s", port)
+            return port
+    raise RuntimeError("Nenhuma porta livre encontrada no range 5000-5100")
+
+
+def _open_logs_folder(log_dir: Path, logger: logging.Logger) -> None:
+    if os.name == "nt":
+        os.startfile(str(log_dir))  # type: ignore[attr-defined]
+    else:
+        logger.warning("Ação 'Abrir pasta de logs' é suportada apenas no Windows.")
+
+
 def main() -> int:
     args = parse_args()
+
+    if args.run_api:
+        from api.server import main as api_main
+
+        api_main(host=args.host, port=args.port, db_path=args.db_path)
+        return 0
+    if args.run_worker:
+        from bot import main as worker_main
+
+        worker_main()
+        return 0
+
     repo_root = Path(__file__).resolve().parents[1]
 
     paths = resolve_app_paths()
@@ -68,38 +110,48 @@ def main() -> int:
     logger.info("[BOOT] LOG_DIR=%s", paths.log_dir)
     logger.info("[BOOT] DB_PATH=%s", paths.db_path.resolve())
 
+    if args.open_logs:
+        _open_logs_folder(paths.log_dir, logger)
+        return 0
+
+    selected_port = _resolve_port(args.host, args.port, logger)
+
     env = os.environ.copy()
     env["TRADINGBOT_LOG_DIR"] = str(paths.log_dir)
     env["TRADINGBOT_APP_VERSION"] = APP_VERSION
     env["TRADINGBOT_WORKER_LOG_FILE"] = str(paths.log_dir / "worker.log")
 
     py_bin = current_python()
-    api_cmd = [
-        py_bin,
-        "-m",
-        "api.server",
-        "--host",
-        args.host,
-        "--port",
-        str(args.port),
-        "--db-path",
-        str(paths.db_path),
-    ]
-    worker_cmd = [
-        py_bin,
-        "-m",
-        "bot",
-        args.config,
-        "--db-path",
-        str(paths.db_path),
-    ]
+    if getattr(sys, "frozen", False):
+        api_cmd = [py_bin, "--run-api", "--host", args.host, "--port", str(selected_port), "--db-path", str(paths.db_path)]
+        worker_cmd = [py_bin, "--run-worker", args.config, "--db-path", str(paths.db_path)]
+    else:
+        api_cmd = [
+            py_bin,
+            "-m",
+            "api.server",
+            "--host",
+            args.host,
+            "--port",
+            str(selected_port),
+            "--db-path",
+            str(paths.db_path),
+        ]
+        worker_cmd = [
+            py_bin,
+            "-m",
+            "bot",
+            args.config,
+            "--db-path",
+            str(paths.db_path),
+        ]
 
     logger.info("[BOOT] Starting API: %s", " ".join(api_cmd))
     api_proc = spawn_process(api_cmd, cwd=repo_root, env=env)
     logger.info("[BOOT] Starting Worker: %s", " ".join(worker_cmd))
     worker_proc = spawn_process(worker_cmd, cwd=repo_root, env=env)
 
-    base_url = f"http://{args.host}:{args.port}"
+    base_url = f"http://{args.host}:{selected_port}"
     try:
         health = _wait_api_ready(base_url, timeout_sec=45, logger=logger)
         logger.info("API health OK: %s", health)
