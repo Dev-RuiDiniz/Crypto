@@ -29,5 +29,6 @@ export const api = {
   upsertBotConfig: (data) => request("/api/bot-config", { method: "POST", body: JSON.stringify(data) }),
   getBotGlobalConfig: () => request("/api/bot-global-config"),
   updateBotGlobalConfig: (data) => request("/api/bot-global-config", { method: "POST", body: JSON.stringify(data) }),
+  getConfigStatus: () => request("/api/config-status"),
   getConfigLegacy: () => request("/api/config")
 };

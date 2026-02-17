@@ -63,6 +63,86 @@ def _classify_worker_status(last_heartbeat_at: Optional[float], stale_after_sec:
     return "ok" if age_sec <= stale_after_sec else "stale"
 
 
+def _ensure_config_version_row(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS config_version (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            version INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT,
+            reason TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO config_version(id, version, updated_at, updated_by, reason)
+        VALUES (1, 1, ?, 'system', 'bootstrap')
+        """,
+        (datetime.utcnow().isoformat(timespec="seconds") + "Z",),
+    )
+
+
+def _get_config_version_payload(conn: sqlite3.Connection) -> Dict[str, Any]:
+    _ensure_config_version_row(conn)
+    row = conn.execute(
+        "SELECT version, updated_at, updated_by, reason FROM config_version WHERE id = 1"
+    ).fetchone()
+    return {
+        "version": int(row["version"] or 1) if row else 1,
+        "updated_at": str(row["updated_at"] or "") if row else "",
+        "updated_by": str((row["updated_by"] or "") if row else ""),
+        "reason": str((row["reason"] or "") if row else ""),
+    }
+
+
+def _bump_config_version(conn: sqlite3.Connection, reason: str, updated_by: str = "api") -> int:
+    _ensure_config_version_row(conn)
+    now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    conn.execute(
+        """
+        UPDATE config_version
+        SET version = version + 1,
+            updated_at = ?,
+            updated_by = ?,
+            reason = ?
+        WHERE id = 1
+        """,
+        (now_iso, str(updated_by or "api"), str(reason or "config updated")),
+    )
+    row = conn.execute("SELECT version FROM config_version WHERE id = 1").fetchone()
+    return int(row["version"] or 1) if row else 1
+
+
+def _ensure_runtime_status_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS runtime_status (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            worker_pid INTEGER,
+            started_at REAL,
+            last_heartbeat_at REAL,
+            db_path TEXT,
+            version TEXT,
+            last_applied_config_version INTEGER,
+            last_applied_config_at TEXT,
+            last_applied_config_reason TEXT
+        )
+        """
+    )
+    cols = {
+        str(r[1]).lower()
+        for r in conn.execute("PRAGMA table_info(runtime_status)").fetchall()
+    }
+    if "last_applied_config_version" not in cols:
+        conn.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_version INTEGER")
+    if "last_applied_config_at" not in cols:
+        conn.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_at TEXT")
+    if "last_applied_config_reason" not in cols:
+        conn.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_reason TEXT")
+
+
 def set_db_path_override(db_path: Optional[str]) -> None:
     global _DB_PATH_OVERRIDE
     if db_path:
@@ -879,13 +959,18 @@ def upsert_bot_config(payload: Dict[str, Any]):
                 float(updated_at),
             ),
         )
+        new_version = _bump_config_version(
+            conn,
+            reason=f"config_pairs updated: {pair}",
+            updated_by="dashboard",
+        )
         conn.commit()
     except Exception as e:
         return False, f"Falha ao salvar bot_config: {e}"
     finally:
         conn.close()
 
-    return True, f"bot_config salvo para {pair}."
+    return True, f"bot_config salvo para {pair}. config_version={new_version}"
 
 
 def get_bot_global_config() -> Dict[str, Any]:
@@ -973,13 +1058,18 @@ def upsert_bot_global_config(payload: Dict[str, Any]):
                 datetime.utcnow().isoformat(timespec="seconds") + "Z",
             ),
         )
+        new_version = _bump_config_version(
+            conn,
+            reason="bot_global_config updated",
+            updated_by="dashboard",
+        )
         conn.commit()
     except Exception as e:
         return False, f"Falha ao salvar bot_global_config: {e}"
     finally:
         conn.close()
 
-    return True, "bot_global_config atualizado com sucesso."
+    return True, f"bot_global_config atualizado com sucesso. config_version={new_version}"
 
 def get_db_health() -> Dict[str, Any]:
     db_path = get_effective_db_path()
@@ -990,18 +1080,7 @@ def get_db_health() -> Dict[str, Any]:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         connect_ok = True
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS runtime_status (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                worker_pid INTEGER,
-                started_at REAL,
-                last_heartbeat_at REAL,
-                db_path TEXT,
-                version TEXT
-            )
-            """
-        )
+        _ensure_runtime_status_schema(conn)
         conn.execute("DELETE FROM runtime_status WHERE COALESCE(id, 1) = 1")
         conn.execute(
             """
@@ -1047,9 +1126,11 @@ def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
+        _ensure_runtime_status_schema(conn)
         row = conn.execute(
             """
-            SELECT worker_pid, started_at, last_heartbeat_at, db_path, version
+            SELECT worker_pid, started_at, last_heartbeat_at, db_path, version,
+                   last_applied_config_version, last_applied_config_at, last_applied_config_reason
             FROM runtime_status
             WHERE COALESCE(id, 1) = 1
             ORDER BY COALESCE(last_heartbeat_at, 0) DESC
@@ -1078,9 +1159,47 @@ def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
             "db_path": str(row["db_path"] or db_path),
             "version": str(row["version"] or ""),
             "started_at": _ts_to_iso8601(float(row["started_at"] or 0.0)),
+            "last_applied_config_version": int(row["last_applied_config_version"] or 0) or None,
+            "last_applied_config_at": str(row["last_applied_config_at"] or "") or None,
+            "last_applied_config_reason": str(row["last_applied_config_reason"] or "") or None,
         }
     )
     return result
+
+
+def get_config_status(stale_after_sec: int = 30) -> Dict[str, Any]:
+    db_path = get_effective_db_path()
+    out: Dict[str, Any] = {
+        "db_config_version": None,
+        "db_config_updated_at": None,
+        "worker_last_applied_config_version": None,
+        "worker_last_applied_config_at": None,
+        "worker_last_applied_config_reason": None,
+        "in_sync": False,
+        "worker_status": "down",
+        "db_path": db_path,
+    }
+    if not os.path.exists(db_path):
+        return out
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        db_cfg = _get_config_version_payload(conn)
+        out["db_config_version"] = int(db_cfg.get("version") or 0)
+        out["db_config_updated_at"] = str(db_cfg.get("updated_at") or "") or None
+        worker = get_worker_health(stale_after_sec=stale_after_sec)
+        out["worker_status"] = worker.get("status")
+        out["worker_last_applied_config_version"] = worker.get("last_applied_config_version")
+        out["worker_last_applied_config_at"] = worker.get("last_applied_config_at")
+        out["worker_last_applied_config_reason"] = worker.get("last_applied_config_reason")
+        out["in_sync"] = (
+            out["db_config_version"] is not None
+            and out["worker_last_applied_config_version"] is not None
+            and int(out["db_config_version"]) == int(out["worker_last_applied_config_version"])
+        )
+        return out
+    finally:
+        conn.close()
 
 
 def debug_snapshot() -> Dict[str, Any]:

@@ -168,15 +168,17 @@ class MainMonitor:
         self.global_config: Dict[str, Any] = {}
         self._last_global_updated_at: str = ""
 
-        # Cache curto para reload dinâmico de bot_config durante o loop.
+        # Reload operacional orientado por versão de configuração (Sprint 3).
         self.bot_config_cache_ttl_sec = float(
-            self.cfg.get("GLOBAL", "BOT_CONFIG_CACHE_TTL_SEC", fallback="5")
+            self.cfg.get("GLOBAL", "BOT_CONFIG_CACHE_TTL_SEC", fallback="0")
         )
         self.bot_configs: Dict[str, Dict[str, Any]] = {}
         self._bot_config_cache_ts: Dict[str, float] = {}
         self._pairs_refresh_ts: float = 0.0
+        self.last_seen_config_version: int = 0
+        self.last_applied_at: str = ""
 
-        self._refresh_pairs_from_db(force=True)
+        self._reload_configs_if_needed(force=True)
 
         # router thresholds/flags
         self.min_notional_usdt = float(
@@ -375,11 +377,6 @@ class MainMonitor:
             return str(value)
 
     def _refresh_pairs_from_db(self, force: bool = False):
-        now = time.time()
-        if not force and (now - self._pairs_refresh_ts) < self.bot_config_cache_ttl_sec:
-            return
-        self._pairs_refresh_ts = now
-
         if not hasattr(self.state, "get_bot_configs"):
             return
 
@@ -390,6 +387,38 @@ class MainMonitor:
             self.pairs = list(dict.fromkeys(seed_pairs + db_pairs))
         except Exception as e:
             log.warning(f"[config_reload] falha ao atualizar pares do banco: {e}")
+
+    def _reload_configs_if_needed(self, force: bool = False) -> None:
+        if not hasattr(self.state, "get_config_version"):
+            if force:
+                self._refresh_pairs_from_db(force=True)
+            return
+        try:
+            version_payload = self.state.get_config_version() or {}
+            current_version = int(version_payload.get("version") or 0)
+            if not force and current_version == self.last_seen_config_version:
+                return
+            self.bot_configs = {}
+            self._bot_config_cache_ts = {}
+            self.global_config = self._load_global_config()
+            self._refresh_pairs_from_db(force=True)
+            self.last_seen_config_version = current_version
+            self.last_applied_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+            reason = str(version_payload.get("reason") or "")
+            log.info(
+                "[CONFIG_APPLIED] version=%s applied_at=%s reason=%s",
+                current_version,
+                self.last_applied_at,
+                reason,
+            )
+            if hasattr(self.state, "update_runtime_applied_config"):
+                self.state.update_runtime_applied_config(
+                    config_version=current_version,
+                    applied_at=self.last_applied_at,
+                    reason=reason,
+                )
+        except Exception as exc:
+            log.warning("[config_reload] falha ao aplicar config por versionamento: %s", exc)
 
     def _load_global_config(self) -> Dict[str, Any]:
         defaults = {
@@ -447,8 +476,7 @@ class MainMonitor:
     def _load_pair_config(self, pair: str, now: float) -> Dict[str, Any]:
         pair_norm = str(pair or "").strip().upper()
         cached = self.bot_configs.get(pair_norm)
-        cache_ts = self._bot_config_cache_ts.get(pair_norm, 0.0)
-        if cached is not None and (now - cache_ts) < self.bot_config_cache_ttl_sec:
+        if cached is not None:
             return cached
 
         cfg: Dict[str, Any] = {
@@ -1197,8 +1225,8 @@ class MainMonitor:
                 mids_map: Dict[str, Dict[str, Optional[float]]] = {}
 
                 try:
+                    self._reload_configs_if_needed()
                     global_cfg = self._apply_global_config()
-                    self._refresh_pairs_from_db()
                     if bool(global_cfg.get("kill_switch_enabled")):
                         log.warning("[global_config] kill_switch_enabled=true: ciclo sem envio de ordens.")
                         self._render_panel(ref_map, mids_map)

@@ -141,6 +141,11 @@ def api_health_worker():
     return jsonify(handlers.get_worker_health())
 
 
+@app.route("/api/config-status")
+def api_config_status():
+    return jsonify(handlers.get_config_status())
+
+
 @app.route("/api/balances")
 def api_balances():
     return jsonify(handlers.get_balances())

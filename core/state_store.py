@@ -140,7 +140,21 @@ class StateStore:
                 started_at REAL,
                 last_heartbeat_at REAL,
                 db_path TEXT,
-                version TEXT
+                version TEXT,
+                last_applied_config_version INTEGER,
+                last_applied_config_at TEXT,
+                last_applied_config_reason TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS config_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                updated_by TEXT,
+                reason TEXT
             )
             """
         )
@@ -184,8 +198,70 @@ class StateStore:
         if "id" not in runtime_cols:
             cur.execute("ALTER TABLE runtime_status ADD COLUMN id INTEGER")
             cur.execute("UPDATE runtime_status SET id = 1 WHERE id IS NULL")
+        if "last_applied_config_version" not in runtime_cols:
+            cur.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_version INTEGER")
+        if "last_applied_config_at" not in runtime_cols:
+            cur.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_at TEXT")
+        if "last_applied_config_reason" not in runtime_cols:
+            cur.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_reason TEXT")
+        self.ensure_config_version_row()
         self.ensure_default_bot_global_config()
         self._conn.commit()
+
+    def ensure_config_version_row(self) -> None:
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO config_version(id, version, updated_at, updated_by, reason)
+            VALUES (1, 1, ?, 'system', 'bootstrap')
+            """,
+            (now_iso,),
+        )
+
+    def get_config_version(self) -> Dict[str, Any]:
+        self.ensure_config_version_row()
+        row = self._conn.execute(
+            """
+            SELECT id, version, updated_at, updated_by, reason
+            FROM config_version
+            WHERE id = 1
+            """
+        ).fetchone()
+        if not row:
+            return {
+                "id": 1,
+                "version": 1,
+                "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "updated_by": "system",
+                "reason": "bootstrap",
+            }
+        return {
+            "id": int(row["id"] if isinstance(row, sqlite3.Row) else row[0]),
+            "version": int(row["version"] if isinstance(row, sqlite3.Row) else row[1]),
+            "updated_at": str(row["updated_at"] if isinstance(row, sqlite3.Row) else row[2]),
+            "updated_by": str((row["updated_by"] if isinstance(row, sqlite3.Row) else row[3]) or ""),
+            "reason": str((row["reason"] if isinstance(row, sqlite3.Row) else row[4]) or ""),
+        }
+
+    def bump_config_version(self, reason: str, updated_by: str = "api") -> int:
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        safe_reason = str(reason or "config updated")
+        safe_updated_by = str(updated_by or "api")
+        with self._conn:
+            self.ensure_config_version_row()
+            self._conn.execute(
+                """
+                UPDATE config_version
+                SET version = version + 1,
+                    updated_at = ?,
+                    updated_by = ?,
+                    reason = ?
+                WHERE id = 1
+                """,
+                (now_iso, safe_updated_by, safe_reason),
+            )
+            row = self._conn.execute("SELECT version FROM config_version WHERE id = 1").fetchone()
+        return int((row["version"] if isinstance(row, sqlite3.Row) else row[0]) if row else 1)
 
     def ensure_default_bot_global_config(self) -> None:
         now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -379,8 +455,11 @@ class StateStore:
             self._conn.execute("DELETE FROM runtime_status")
             self._conn.execute(
                 """
-                INSERT INTO runtime_status(id, worker_pid, started_at, last_heartbeat_at, db_path, version)
-                VALUES (1, ?, ?, ?, ?, ?)
+                INSERT INTO runtime_status(
+                    id, worker_pid, started_at, last_heartbeat_at, db_path, version,
+                    last_applied_config_version, last_applied_config_at, last_applied_config_reason
+                )
+                VALUES (1, ?, ?, ?, ?, ?, NULL, NULL, NULL)
                 """,
                 (int(worker_pid), float(started_at), float(time.time()), str(db_path), str(version)),
             )
@@ -401,6 +480,22 @@ class StateStore:
             self._conn.commit()
         except Exception as e:
             log.warning(f"[runtime_status] heartbeat falha: {e}")
+
+    def update_runtime_applied_config(self, config_version: int, applied_at: str, reason: str = "") -> None:
+        try:
+            self._conn.execute(
+                """
+                UPDATE runtime_status
+                SET last_applied_config_version = ?,
+                    last_applied_config_at = ?,
+                    last_applied_config_reason = ?
+                WHERE id = 1
+                """,
+                (int(config_version), str(applied_at), str(reason or "")),
+            )
+            self._conn.commit()
+        except Exception as e:
+            log.warning(f"[runtime_status] update applied config falha: {e}")
 
     def log_event(self, event_type: str, payload: Dict[str, Any]):
         ts = time.time()
