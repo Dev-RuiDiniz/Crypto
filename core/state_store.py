@@ -66,6 +66,41 @@ class StateStore:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS arbitrage_config (
+                tenant_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                exchange_a TEXT,
+                exchange_b TEXT,
+                threshold_percent REAL NOT NULL DEFAULT 0.15,
+                threshold_absolute REAL NOT NULL DEFAULT 0.2,
+                max_trade_size REAL NOT NULL DEFAULT 0,
+                cooldown_ms INTEGER NOT NULL DEFAULT 0,
+                mode TEXT NOT NULL DEFAULT 'TWO_LEG',
+                fee_percent REAL NOT NULL DEFAULT 0.1,
+                slippage_percent REAL NOT NULL DEFAULT 0.05,
+                updated_at REAL,
+                PRIMARY KEY (tenant_id, symbol)
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS arbitrage_state (
+                tenant_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                runtime_state TEXT NOT NULL DEFAULT 'IDLE',
+                strategy_lock INTEGER NOT NULL DEFAULT 0,
+                last_opportunity TEXT,
+                last_execution TEXT,
+                last_success_ts INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL,
+                PRIMARY KEY (tenant_id, symbol)
+            )
+            """
+        )
         # Migração mínima para bancos existentes: adiciona colunas de bot_config se faltarem.
         existing_cols = {
             str(r[1]).lower()
@@ -917,6 +952,145 @@ class StateStore:
                     ])
             except Exception as e:
                 log.warning(f"[fills.csv] falha: {e}")
+
+    def upsert_arbitrage_config(self, payload: Dict[str, Any]) -> None:
+        now = float(time.time())
+        self._conn.execute(
+            """
+            INSERT INTO arbitrage_config(
+                tenant_id, symbol, enabled, exchange_a, exchange_b,
+                threshold_percent, threshold_absolute, max_trade_size,
+                cooldown_ms, mode, fee_percent, slippage_percent, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, symbol) DO UPDATE SET
+                enabled=excluded.enabled,
+                exchange_a=excluded.exchange_a,
+                exchange_b=excluded.exchange_b,
+                threshold_percent=excluded.threshold_percent,
+                threshold_absolute=excluded.threshold_absolute,
+                max_trade_size=excluded.max_trade_size,
+                cooldown_ms=excluded.cooldown_ms,
+                mode=excluded.mode,
+                fee_percent=excluded.fee_percent,
+                slippage_percent=excluded.slippage_percent,
+                updated_at=excluded.updated_at
+            """,
+            (
+                str(payload.get("tenant_id") or "default"),
+                str(payload.get("symbol") or "").upper(),
+                1 if bool(payload.get("enabled", False)) else 0,
+                str(payload.get("exchange_a") or "").lower(),
+                str(payload.get("exchange_b") or "").lower(),
+                float(payload.get("threshold_percent") or 0.15),
+                float(payload.get("threshold_absolute") or 0.2),
+                float(payload.get("max_trade_size") or 0.0),
+                int(payload.get("cooldown_ms") or 0),
+                str(payload.get("mode") or "TWO_LEG").upper(),
+                float(payload.get("fee_percent") or 0.1),
+                float(payload.get("slippage_percent") or 0.05),
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_arbitrage_config(self, tenant_id: str, symbol: str) -> Dict[str, Any]:
+        row = self._conn.execute(
+            """
+            SELECT tenant_id, symbol, enabled, exchange_a, exchange_b,
+                   threshold_percent, threshold_absolute, max_trade_size,
+                   cooldown_ms, mode, fee_percent, slippage_percent, updated_at
+            FROM arbitrage_config
+            WHERE tenant_id=? AND symbol=?
+            """,
+            (str(tenant_id or "default"), str(symbol or "").upper()),
+        ).fetchone()
+        if not row:
+            return {}
+        return {
+            "tenant_id": str(row[0]),
+            "symbol": str(row[1]),
+            "enabled": bool(row[2]),
+            "exchange_a": str(row[3] or ""),
+            "exchange_b": str(row[4] or ""),
+            "threshold_percent": float(row[5] or 0.0),
+            "threshold_absolute": float(row[6] or 0.0),
+            "max_trade_size": float(row[7] or 0.0),
+            "cooldown_ms": int(row[8] or 0),
+            "mode": str(row[9] or "TWO_LEG"),
+            "fee_percent": float(row[10] or 0.1),
+            "slippage_percent": float(row[11] or 0.05),
+            "updated_at": float(row[12] or 0.0),
+        }
+
+    def upsert_arbitrage_state(self, tenant_id: str, symbol: str, runtime_state: Optional[str] = None,
+                               strategy_lock: Optional[bool] = None, last_opportunity: Optional[Dict[str, Any]] = None,
+                               last_execution: Optional[Dict[str, Any]] = None, last_success_ts: Optional[int] = None) -> None:
+        current = self.get_arbitrage_state(tenant_id, symbol)
+        merged_runtime = str(runtime_state or current.get("runtime_state") or "IDLE")
+        merged_lock = 1 if bool(strategy_lock if strategy_lock is not None else current.get("strategy_lock", False)) else 0
+        merged_opp = last_opportunity if last_opportunity is not None else current.get("last_opportunity")
+        merged_exec = last_execution if last_execution is not None else current.get("last_execution")
+        merged_success = int(last_success_ts if last_success_ts is not None else current.get("last_success_ts", 0) or 0)
+        now = float(time.time())
+        self._conn.execute(
+            """
+            INSERT INTO arbitrage_state(
+                tenant_id, symbol, runtime_state, strategy_lock, last_opportunity,
+                last_execution, last_success_ts, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, symbol) DO UPDATE SET
+                runtime_state=excluded.runtime_state,
+                strategy_lock=excluded.strategy_lock,
+                last_opportunity=excluded.last_opportunity,
+                last_execution=excluded.last_execution,
+                last_success_ts=excluded.last_success_ts,
+                updated_at=excluded.updated_at
+            """,
+            (
+                str(tenant_id or "default"),
+                str(symbol or "").upper(),
+                merged_runtime,
+                merged_lock,
+                json.dumps(merged_opp or {}, ensure_ascii=False),
+                json.dumps(merged_exec or {}, ensure_ascii=False),
+                merged_success,
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_arbitrage_state(self, tenant_id: str, symbol: str) -> Dict[str, Any]:
+        row = self._conn.execute(
+            """
+            SELECT tenant_id, symbol, runtime_state, strategy_lock,
+                   last_opportunity, last_execution, last_success_ts, updated_at
+            FROM arbitrage_state
+            WHERE tenant_id=? AND symbol=?
+            """,
+            (str(tenant_id or "default"), str(symbol or "").upper()),
+        ).fetchone()
+        if not row:
+            return {}
+        try:
+            last_opp = json.loads(str(row[4] or "{}"))
+        except Exception:
+            last_opp = {}
+        try:
+            last_exec = json.loads(str(row[5] or "{}"))
+        except Exception:
+            last_exec = {}
+        return {
+            "tenant_id": str(row[0]),
+            "symbol": str(row[1]),
+            "runtime_state": str(row[2] or "IDLE"),
+            "strategy_lock": bool(row[3]),
+            "last_opportunity": last_opp,
+            "last_execution": last_exec,
+            "last_success_ts": int(row[6] or 0),
+            "updated_at": float(row[7] or 0.0),
+        }
 
     # ------------------------------------------------------------------
     # API pública — leitura (útil para painel / debug / API)

@@ -7,6 +7,7 @@ Este repositório contém um bot de trading spot multipar com execução local, 
 ## O que o bot faz hoje
 - Opera múltiplos pares configuráveis.
 - Calcula alvos por spread (%) configurável por par.
+- Estratégia alternativa `StrategyArbitrageSimple` configurável por par no dashboard.
 - Mantém ordens (cancel/recreate) conforme variação do mercado.
 - Executa em modo **PAPER** e **LIVE**.
 - Exibe status em dashboard (mids, ordens, saldos, eventos).
@@ -15,7 +16,7 @@ Este repositório contém um bot de trading spot multipar com execução local, 
 
 ## O que ainda não está completo
 - Streaming websocket de order book no loop principal (hoje: polling).
-- Estratégia explícita de arbitragem simples (detector + execução de duas pernas).
+- Estratégia de arbitragem simples MVP com lock por par, idempotência por perna e status dedicado (Sprint 7).
 
 ---
 

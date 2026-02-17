@@ -67,6 +67,9 @@ export const api = {
   getBotGlobalConfig: () => request("/api/bot-global-config"),
   updateBotGlobalConfig: (data) => request("/api/bot-global-config", { method: "POST", body: JSON.stringify(data) }),
   getConfigStatus: () => request("/api/config-status"),
+  getArbitrageConfig: (pair) => request(`/api/arbitrage-config?pair=${encodeURIComponent(pair)}`),
+  upsertArbitrageConfig: (data) => request("/api/arbitrage-config", { method: "POST", body: JSON.stringify(data) }),
+  getArbitrageStatus: (pair) => request(`/api/arbitrage-status?pair=${encodeURIComponent(pair)}`),
   getConfigLegacy: () => request("/api/config"),
 
   getExchangeCredentials: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials`),
