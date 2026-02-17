@@ -122,9 +122,11 @@ def api_health():
     return jsonify(
         {
             "status": "ok",
-            "db_path": handlers.get_effective_db_path(),
-            "app_version": APP_VERSION,
+            "app": "trading-bot",
+            "version": APP_VERSION,
             "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "db_path": handlers.get_effective_db_path(),
+            "pid": os.getpid(),
         }
     )
 

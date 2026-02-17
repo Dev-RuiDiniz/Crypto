@@ -275,11 +275,15 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
     if db_path_override:
         if "GLOBAL" not in cfg:
             cfg["GLOBAL"] = {}
-        cfg["GLOBAL"]["SQLITE_PATH"] = os.path.abspath(db_path_override)
+        cfg["GLOBAL"]["SQLITE_PATH"] = os.path.abspath(os.path.expanduser(db_path_override))
     ensure_directories()
     setup_logging_from_config(cfg)
 
-    resolved_db_path = os.path.abspath(cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db"))
+    resolved_db_path = os.path.abspath(os.path.expanduser(cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db")))
+    os.makedirs(os.path.dirname(resolved_db_path), exist_ok=True)
+    if "GLOBAL" not in cfg:
+        cfg["GLOBAL"] = {}
+    cfg["GLOBAL"]["SQLITE_PATH"] = resolved_db_path
     log.info("[BOOT] DB_PATH=%s", resolved_db_path)
     log.info("[BOOT] APP_VERSION=%s", APP_VERSION)
 

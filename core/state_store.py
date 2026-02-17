@@ -134,6 +134,7 @@ class StateStore:
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS runtime_status (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
                 worker_pid INTEGER,
                 started_at REAL,
                 last_heartbeat_at REAL,
@@ -142,6 +143,13 @@ class StateStore:
             )
             """
         )
+        runtime_cols = {
+            str(r[1]).lower()
+            for r in cur.execute("PRAGMA table_info(runtime_status)").fetchall()
+        }
+        if "id" not in runtime_cols:
+            cur.execute("ALTER TABLE runtime_status ADD COLUMN id INTEGER")
+            cur.execute("UPDATE runtime_status SET id = 1 WHERE id IS NULL")
         self._conn.commit()
 
     @staticmethod
@@ -262,8 +270,8 @@ class StateStore:
             self._conn.execute("DELETE FROM runtime_status")
             self._conn.execute(
                 """
-                INSERT INTO runtime_status(worker_pid, started_at, last_heartbeat_at, db_path, version)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO runtime_status(id, worker_pid, started_at, last_heartbeat_at, db_path, version)
+                VALUES (1, ?, ?, ?, ?, ?)
                 """,
                 (int(worker_pid), float(started_at), float(time.time()), str(db_path), str(version)),
             )
@@ -277,6 +285,7 @@ class StateStore:
                 """
                 UPDATE runtime_status
                 SET last_heartbeat_at = ?, worker_pid = ?
+                WHERE id = 1
                 """,
                 (float(time.time()), int(worker_pid)),
             )

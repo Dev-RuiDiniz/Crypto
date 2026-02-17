@@ -1142,73 +1142,83 @@ class MainMonitor:
                 try:
                     self._refresh_pairs_from_db()
                     for pair in self.pairs:
-                        cycle_now = time.time()
-                        pair_cfg = self._load_pair_config(pair, cycle_now)
+                        try:
+                            cycle_now = time.time()
+                            pair_cfg = self._load_pair_config(pair, cycle_now)
 
-                        cfg_strategy = str(pair_cfg.get("strategy") or self.strategy.__class__.__name__)
-                        cfg_enabled = bool(pair_cfg.get("enabled", True))
-                        cfg_risk = float(pair_cfg.get("risk_percentage") or 0.0)
-                        cfg_max_loss = float(pair_cfg.get("max_daily_loss") or 0.0)
-                        cfg_updated_at = float(pair_cfg.get("updated_at") or 0.0)
+                            cfg_strategy = str(pair_cfg.get("strategy") or self.strategy.__class__.__name__)
+                            cfg_enabled = bool(pair_cfg.get("enabled", True))
+                            cfg_risk = float(pair_cfg.get("risk_percentage") or 0.0)
+                            cfg_max_loss = float(pair_cfg.get("max_daily_loss") or 0.0)
+                            cfg_updated_at = float(pair_cfg.get("updated_at") or 0.0)
 
-                        log.info(
-                            "[config_reload] ts=%s pair=%s updated_at=%s enabled=%s risk_percentage=%.4f strategy=%s",
-                            datetime.utcnow().isoformat() + "Z",
-                            pair,
-                            self._fmt_updated_at(cfg_updated_at),
-                            cfg_enabled,
-                            cfg_risk,
-                            cfg_strategy,
-                        )
-
-                        if not cfg_enabled:
-                            log.info(f"[ExecutionEngine] {pair} desabilitado em bot_config. Ignorando.")
-                            continue
-
-                        strategy_name = self.strategy.__class__.__name__
-                        if cfg_strategy.lower() not in (strategy_name.lower(), self.strategy.__class__.__name__.lower()):
                             log.info(
-                                f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, "
-                                f"mas runtime atual={strategy_name}. Ignorando par."
+                                "[config_reload] ts=%s pair=%s updated_at=%s enabled=%s risk_percentage=%.4f strategy=%s",
+                                datetime.utcnow().isoformat() + "Z",
+                                pair,
+                                self._fmt_updated_at(cfg_updated_at),
+                                cfg_enabled,
+                                cfg_risk,
+                                cfg_strategy,
+                            )
+
+                            if not cfg_enabled:
+                                log.info(f"[ExecutionEngine] {pair} desabilitado em bot_config. Ignorando.")
+                                continue
+
+                            strategy_name = self.strategy.__class__.__name__
+                            if cfg_strategy.lower() not in (strategy_name.lower(), self.strategy.__class__.__name__.lower()):
+                                log.info(
+                                    f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, "
+                                    f"mas runtime atual={strategy_name}. Ignorando par."
+                                )
+                                continue
+
+                            log.info(
+                                f"[ExecutionEngine] {datetime.utcnow().isoformat()}Z - "
+                                f"Symbol: {pair} - Strategy: {cfg_strategy}"
+                            )
+                            mids = await self._mid_per_exchange(pair)
+                            mids_map[pair] = mids
+                            ref = self._reference_price(pair, mids)
+                            if ref is not None:
+                                ref_map[pair] = float(ref)
+
+                            buy_tgt, sell_tgt = self.strategy.targets_for(
+                                pair, float(ref or 0.0)
+                            )
+
+                            ref_v = float(ref) if ref is not None else 0.0
+                            if self.anchor_mode == "LOCAL":
+                                log.info(
+                                    f"[{pair}] ref={ref_v:.6f} (informativo) — "
+                                    "ANCHOR_MODE=LOCAL: router usará ask/bid "
+                                    "locais ± spread configurado."
+                                )
+                            else:
+                                log.info(
+                                    f"[{pair}] ref={ref_v:.6f} -> "
+                                    f"buy_tgt={buy_tgt:.6f} | sell_tgt={sell_tgt:.6f}"
+                                )
+
+                            await self.router.reprice_pair(
+                                pair=pair,
+                                ref_usdt=float(ref or 0.0),
+                                buy_target_usdt=float(buy_tgt),
+                                sell_target_usdt=float(sell_tgt),
+                                min_notional_usdt=self.min_notional_usdt,
+                                risk_percentage=cfg_risk,
+                                max_daily_loss=cfg_max_loss,
+                            )
+                        except Exception as pair_exc:
+                            log.error(
+                                "[pair_loop] pair=%s error_type=%s message=%s",
+                                pair,
+                                type(pair_exc).__name__,
+                                str(pair_exc),
+                                exc_info=True,
                             )
                             continue
-
-                        log.info(
-                            f"[ExecutionEngine] {datetime.utcnow().isoformat()}Z - "
-                            f"Symbol: {pair} - Strategy: {cfg_strategy}"
-                        )
-                        mids = await self._mid_per_exchange(pair)
-                        mids_map[pair] = mids
-                        ref = self._reference_price(pair, mids)
-                        if ref is not None:
-                            ref_map[pair] = float(ref)
-
-                        buy_tgt, sell_tgt = self.strategy.targets_for(
-                            pair, float(ref or 0.0)
-                        )
-
-                        ref_v = float(ref) if ref is not None else 0.0
-                        if self.anchor_mode == "LOCAL":
-                            log.info(
-                                f"[{pair}] ref={ref_v:.6f} (informativo) — "
-                                "ANCHOR_MODE=LOCAL: router usará ask/bid "
-                                "locais ± spread configurado."
-                            )
-                        else:
-                            log.info(
-                                f"[{pair}] ref={ref_v:.6f} -> "
-                                f"buy_tgt={buy_tgt:.6f} | sell_tgt={sell_tgt:.6f}"
-                            )
-
-                        await self.router.reprice_pair(
-                            pair=pair,
-                            ref_usdt=float(ref or 0.0),
-                            buy_target_usdt=float(buy_tgt),
-                            sell_target_usdt=float(sell_tgt),
-                            min_notional_usdt=self.min_notional_usdt,
-                            risk_percentage=cfg_risk,
-                            max_daily_loss=cfg_max_loss,
-                        )
 
                     self._render_panel(ref_map, mids_map)
 
