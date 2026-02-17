@@ -170,6 +170,9 @@ class PaperMultiPairTests(unittest.IsolatedAsyncioTestCase):
         conn.commit()
         conn.close()
 
+        self.state.bump_config_version("test risk update", updated_by="test")
+        monitor._reload_configs_if_needed()
+
         cfg_after = monitor._load_pair_config("SOL/USDT", now=2.0)
         await self.router.reprice_pair("SOL/USDT", 100.0, 100.0, 100.0, risk_percentage=cfg_after["risk_percentage"])
 

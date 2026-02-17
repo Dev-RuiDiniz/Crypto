@@ -12,6 +12,15 @@ export function BotConfigPanel() {
   const [rows, setRows] = useState([]);
   const [globalCfg, setGlobalCfg] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [configStatus, setConfigStatus] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const fmtTime = (isoValue) => {
+    if (!isoValue) return "—";
+    const d = new Date(isoValue);
+    if (Number.isNaN(d.getTime())) return String(isoValue);
+    return d.toLocaleTimeString("pt-BR", { hour12: false });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -28,6 +37,8 @@ export function BotConfigPanel() {
         max_positions: globalData.max_positions || 1,
         max_daily_loss: globalData.max_daily_loss || 0
       });
+      const status = await api.getConfigStatus();
+      setConfigStatus(status);
     } catch (err) {
       toast(err.message || "Falha ao carregar configurações", true);
     } finally {
@@ -39,35 +50,61 @@ export function BotConfigPanel() {
     load();
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const status = await api.getConfigStatus();
+        setConfigStatus(status);
+      } catch (_err) {}
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const updateRow = (idx, key, value) => {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
   };
 
   const saveRow = async (row) => {
     try {
+      setSaving(true);
       await api.upsertBotConfig(row);
       toast("Salvo com sucesso");
       await load();
     } catch (err) {
       toast(err.message || "Falha ao salvar par", true);
+    } finally {
+      setSaving(false);
     }
   };
 
   const saveGlobal = async () => {
     try {
+      setSaving(true);
       await api.updateBotGlobalConfig(globalCfg);
       toast("Salvo com sucesso");
       await load();
     } catch (err) {
       toast(err.message || "Falha ao salvar config global", true);
+    } finally {
+      setSaving(false);
     }
   };
+
+  const inSync = !!(configStatus && configStatus.in_sync);
 
   if (loading) return e("div", { className: "panel" }, "Carregando configurações do bot...");
 
   return e(
     "div",
     null,
+    configStatus && e(
+      "div",
+      { className: "panel" },
+      e("h2", null, "Status de Aplicação"),
+      e("p", null, `Config do banco: v${configStatus.db_config_version || "-"} (atualizado às ${fmtTime(configStatus.db_config_updated_at)})`),
+      e("p", null, `Worker aplicou: v${configStatus.worker_last_applied_config_version || "-"} (aplicado às ${fmtTime(configStatus.worker_last_applied_config_at)})`),
+      e("strong", { className: inSync && !saving ? "text-success" : "text-warning" }, (!inSync || saving) ? "Aplicando..." : `Aplicado às ${fmtTime(configStatus.worker_last_applied_config_at)}`)
+    ),
     e(
       "div",
       { className: "panel" },
