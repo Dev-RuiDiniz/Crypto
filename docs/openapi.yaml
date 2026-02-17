@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Trading Bot API - Exchange Credentials
+  version: "2.0"
+  description: Endpoints seguros para gestão de credenciais de exchange por tenant.
+servers:
+  - url: http://localhost:8000
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ExchangeCredentialListItem:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        exchange: { type: string, example: mexc }
+        label: { type: string, example: Conta Principal }
+        last4: { type: string, example: A9X2 }
+        status: { type: string, example: ACTIVE }
+        updatedAt: { type: string, format: date-time }
+    ExchangeCredentialCreateRequest:
+      type: object
+      required: [exchange, label, apiKey, apiSecret]
+      properties:
+        exchange: { type: string, example: mexc }
+        label: { type: string, example: Conta Principal }
+        apiKey: { type: string }
+        apiSecret: { type: string }
+        passphrase: { type: string, nullable: true }
+    ExchangeCredentialUpdateRequest:
+      type: object
+      properties:
+        label: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE, REVOKED] }
+        apiKey: { type: string }
+        apiSecret: { type: string }
+        passphrase: { type: string, nullable: true }
+    ExchangeCredentialTestResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        latencyMs: { type: integer, example: 183 }
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string, example: VALIDATION_ERROR }
+        message: { type: string, example: Descrição humana curta }
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string, example: apiKey }
+              issue: { type: string, example: too_short }
+        correlationId: { type: string, example: 20260217101010999999 }
+paths:
+  /api/tenants/{tenantId}/exchange-credentials:
+    get:
+      summary: Listar credenciais (sem segredo)
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExchangeCredentialListItem' }
+        "401": { description: Não autenticado, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "403": { description: Sem permissão, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      summary: Criar credencial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExchangeCredentialCreateRequest' }
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeCredentialListItem' }
+        "400": { description: Validação, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "409": { description: Conflito, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "429": { description: Rate limit, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/tenants/{tenantId}/exchange-credentials/{id}:
+    put:
+      summary: Atualizar / rotacionar
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExchangeCredentialUpdateRequest' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeCredentialListItem' }
+        "400": { description: Validação, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "404": { description: Não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "429": { description: Rate limit, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      summary: Revogar (soft delete)
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: No Content }
+        "404": { description: Não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/tenants/{tenantId}/exchange-credentials/{id}/test:
+    post:
+      summary: Testar conexão sem operar trade
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeCredentialTestResponse' }
+              examples:
+                success:
+                  value: { ok: true, latencyMs: 183 }
+        "400": { description: Falha de teste/validação, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "404": { description: Não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        "429": { description: Rate limit, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
