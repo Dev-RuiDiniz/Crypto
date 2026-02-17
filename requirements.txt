@@ -11,6 +11,7 @@ Flask==3.0.3
 # Utilidades
 pytz==2024.2
 colorama==0.4.6
+cryptography==44.0.1
 
 # --- Opcionais (comentados) ---
 # aiodns==3.2.0           # opcional: acelera resolução DNS para aiohttp

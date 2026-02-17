@@ -118,6 +118,59 @@ class StateStore:
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS tenants (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS exchange_credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                exchange TEXT NOT NULL,
+                label TEXT NOT NULL,
+                api_key_encrypted TEXT NOT NULL,
+                api_secret_encrypted TEXT NOT NULL,
+                passphrase_encrypted TEXT,
+                last4 TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                created_by TEXT,
+                updated_by TEXT,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                UNIQUE (tenant_id, exchange, label)
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_exchange_credentials_tenant_exchange
+            ON exchange_credentials (tenant_id, exchange)
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                resource_type TEXT NOT NULL,
+                resource_id TEXT NOT NULL,
+                user_id TEXT,
+                created_at TEXT NOT NULL,
+                metadata TEXT,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS paper_orders (
                 id TEXT PRIMARY KEY,
                 ts REAL,
@@ -206,7 +259,18 @@ class StateStore:
             cur.execute("ALTER TABLE runtime_status ADD COLUMN last_applied_config_reason TEXT")
         self.ensure_config_version_row()
         self.ensure_default_bot_global_config()
+        self.ensure_default_tenant()
         self._conn.commit()
+
+    def ensure_default_tenant(self) -> None:
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO tenants(id, name, status, created_at)
+            VALUES ('default', 'default', 'ACTIVE', ?)
+            """,
+            (now_iso,),
+        )
 
     def ensure_config_version_row(self) -> None:
         now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"

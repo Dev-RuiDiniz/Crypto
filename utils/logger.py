@@ -10,6 +10,8 @@ import time
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict
 
+from security.redaction import redact_message, redact_value
+
 try:
     from colorama import init as colorama_init, Fore, Style
     colorama_init(autoreset=True)
@@ -75,6 +77,26 @@ class DedupFilter(logging.Filter):
         if now - last < self.window:
             return False
         self._last[key] = now
+        return True
+
+
+class RedactSecretsFilter(logging.Filter):
+    """Remove dados sensíveis antes de persistir/exibir logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if isinstance(record.msg, dict):
+                record.msg = redact_value(record.msg)
+                record.args = ()
+                return True
+
+            record.msg = redact_message(str(record.msg))
+            if isinstance(record.args, tuple):
+                record.args = tuple(redact_value(arg) for arg in record.args)
+            elif isinstance(record.args, dict):
+                record.args = redact_value(record.args)
+        except Exception:
+            return True
         return True
 
 # ----------------------------- helpers -----------------------------
@@ -169,6 +191,7 @@ def configure_logging(
     ch = logging.StreamHandler(stream=sys.stdout)
     ch.setLevel(getattr(logging, console_level.upper(), logging.INFO))
     ch.setFormatter(HumanConsoleFormatter())
+    ch.addFilter(RedactSecretsFilter())
     # Anti-flood opcional
     try:
         dedup_sec = float(console_dedup_sec or 0.0)
@@ -197,6 +220,7 @@ def configure_logging(
     )
     fh.setLevel(getattr(logging, file_level.upper(), logging.DEBUG))
     fh.setFormatter(DetailedFileFormatter())
+    fh.addFilter(RedactSecretsFilter())
     _DETAIL_HANDLER = fh
 
     # Silencia libs ruidosas

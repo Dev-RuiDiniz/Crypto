@@ -29,6 +29,7 @@ except Exception:
 
 # Adapter MB v4 (privadas)
 from .adapters import MBV4Adapter
+from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
 
 log = get_logger("exchanges")
 
@@ -77,8 +78,15 @@ def _ccxt_id_candidates(ex_name: str) -> List[str]:
 # --------- Classe ---------
 
 class ExchangeHub:
-    def __init__(self, config: configparser.ConfigParser):
+    def __init__(
+        self,
+        config: configparser.ConfigParser,
+        credentials_service: Optional[ExchangeCredentialsService] = None,
+        tenant_id: str = "default",
+    ):
         self.cfg = config
+        self.tenant_id = tenant_id
+        self.credentials_service = credentials_service or ExchangeCredentialsService(config)
         self.mode = self.cfg.get("GLOBAL", "MODE", fallback="PAPER").upper()
         self.usdt_brl = float(self.cfg.get("GLOBAL", "USDT_BRL_RATE", fallback="5.50"))
         
@@ -116,7 +124,21 @@ class ExchangeHub:
         # Adapter nativo MB v4 (privadas)
         self.mb_v4: Optional[MBV4Adapter] = None
         if "mercadobitcoin" in [x.lower() for x in self.enabled_ids]:
-            self.mb_v4 = MBV4Adapter(self.cfg)
+            mb_cfg = configparser.ConfigParser(interpolation=None)
+            mb_cfg.read_dict({s: dict(self.cfg.items(s)) for s in self.cfg.sections()})
+            if not mb_cfg.has_section("EXCHANGES.mercadobitcoin"):
+                mb_cfg.add_section("EXCHANGES.mercadobitcoin")
+            try:
+                mb_creds = self.credentials_service.get_credentials(self.tenant_id, "mercadobitcoin")
+                mb_cfg["EXCHANGES.mercadobitcoin"]["api_key"] = mb_creds.api_key
+                mb_cfg["EXCHANGES.mercadobitcoin"]["api_secret"] = mb_creds.api_secret
+                mb_cfg["EXCHANGES.mercadobitcoin"]["password"] = mb_creds.passphrase or ""
+                mb_cfg["EXCHANGES.mercadobitcoin"]["mbv4_login"] = ""
+                mb_cfg["EXCHANGES.mercadobitcoin"]["mbv4_password"] = ""
+                mb_cfg["EXCHANGES.mercadobitcoin"]["mbv4_bearer_token"] = ""
+            except CredentialsNotFoundError:
+                pass
+            self.mb_v4 = MBV4Adapter(mb_cfg)
             if self.mb_v4.enabled and not (self.mb_v4.token or (self.mb_v4.login_user and self.mb_v4.login_pass)):
                 log.warning("[mercadobitcoin v4] ativo porém sem token/login — privadas desabilitadas no MB até configurar MBV4_BEARER_TOKEN ou MBV4_LOGIN/MBV4_PASSWORD.")
 
@@ -229,11 +251,11 @@ class ExchangeHub:
         return out
 
     def _build_auth_params(self, ex_name: str) -> Dict[str, Any]:
-        sect = f"EXCHANGES.{ex_name}"
+        creds = self.credentials_service.get_credentials(self.tenant_id, ex_name)
         return {
-            "apiKey": self.cfg.get(sect, "API_KEY", fallback=None),
-            "secret": self.cfg.get(sect, "API_SECRET", fallback=None),
-            "password": self.cfg.get(sect, "PASSWORD", fallback=None),
+            "apiKey": creds.api_key,
+            "secret": creds.api_secret,
+            "password": creds.passphrase,
         }
 
     # ---------------- boot
@@ -252,7 +274,15 @@ class ExchangeHub:
         ])
 
     async def _instantiate_exchange(self, ex_name: str) -> Optional[ccxt.Exchange]:
-        params = self._build_auth_params(ex_name)
+        try:
+            params = self._build_auth_params(ex_name)
+        except CredentialsNotFoundError:
+            log.error(
+                "[%s] credenciais ausentes no cofre para tenant=%s; cadastre exchange_credentials ativa.",
+                ex_name,
+                self.tenant_id,
+            )
+            raise
         for cand in _ccxt_id_candidates(ex_name):
             if not hasattr(ccxt, cand):
                 continue
