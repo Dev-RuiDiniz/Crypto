@@ -79,5 +79,9 @@ export const api = {
   revokeExchangeCredential: (tenantId, id) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials/${encodeURIComponent(id)}`, { method: "DELETE" }),
   testExchangeCredential: (tenantId, id) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials/${encodeURIComponent(id)}/test`, { method: "POST" }),
 
+  getNotificationSettings: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`),
+  updateNotificationSettings: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`, { method: "PUT", body: JSON.stringify(payload) }),
+  testNotification: (tenantId, channel) => request(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/test`, { method: "POST", body: JSON.stringify({ channel }) }),
+
   getAuthContext
 };

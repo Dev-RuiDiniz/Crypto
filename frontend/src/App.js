@@ -5,6 +5,7 @@ const e = React.createElement;
 import { Dashboard } from "./components/Dashboard.js";
 import { BotConfigPanel } from "./components/BotConfigPanel.js";
 import { ExchangesSettings } from "./components/ExchangesSettings.js";
+import { NotificationsSettings } from "./components/NotificationsSettings.js";
 
 const REFRESH_MS = 2000;
 
@@ -63,10 +64,12 @@ export default function App() {
                 e("div", { className: "panel" },
                   e("h2", null, "Configurações"),
                   e("div", { className: "tabs" },
-                    e("button", { className: "tab-button" + (settingsTab === "exchanges" ? " tab-button-active" : ""), onClick: () => setSettingsTab("exchanges") }, "Exchanges")
+                    e("button", { className: "tab-button" + (settingsTab === "exchanges" ? " tab-button-active" : ""), onClick: () => setSettingsTab("exchanges") }, "Exchanges"),
+                    e("button", { className: "tab-button" + (settingsTab === "notifications" ? " tab-button-active" : ""), onClick: () => setSettingsTab("notifications") }, "Notificações")
                   )
                 ),
-                settingsTab === "exchanges" && e(ExchangesSettings)
+                settingsTab === "exchanges" && e(ExchangesSettings),
+                settingsTab === "notifications" && e(NotificationsSettings)
               )
       )
     )

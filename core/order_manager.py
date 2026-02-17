@@ -27,15 +27,17 @@ except Exception:
 
 Key = Tuple[str, str, str]  # (ex_name, pair, side)
 from core.risk_policy import RiskPolicy
+from core.notification_service import NotificationEventType, NotificationSeverity
 
 
 class OrderManager:
-    def __init__(self, cfg: configparser.ConfigParser, ex_hub, state, risk, risk_policy=None):
+    def __init__(self, cfg: configparser.ConfigParser, ex_hub, state, risk, risk_policy=None, notification_service=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.state = state
         self.risk = risk
-        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk)
+        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk, notification_service=notification_service)
+        self.notification_service = notification_service
 
         # registro simples em memória
         self._live: Dict[Key, LiveOrder] = {}
@@ -264,6 +266,21 @@ class OrderManager:
                 self.state.record_order_create(live)
             except Exception as e:
                 log.warning(f"[state_store] create falhou para {order_id}: {e}")
+
+            if self.notification_service is not None:
+                self.notification_service.notify_nowait(
+                    tenant_id=str(getattr(self.ex_hub, "tenant_id", "default")),
+                    event_type=NotificationEventType.ORDER_EXECUTED,
+                    severity=NotificationSeverity.IMPORTANT,
+                    payload={
+                        "symbol": pair,
+                        "exchange": ex_name,
+                        "amount": float(amount_q),
+                        "price": float(price_usdt),
+                        "reason": "order_executed",
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    },
+                )
 
         except Exception as e:
             msg = str(e)

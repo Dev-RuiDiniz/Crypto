@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from core.notification_service import NotificationEventType, NotificationSeverity
+
 try:
     from utils.logger import get_logger
 except Exception:
@@ -24,11 +26,12 @@ class RiskDecision:
 
 
 class RiskPolicy:
-    def __init__(self, cfg, state, ex_hub, risk_manager=None):
+    def __init__(self, cfg, state, ex_hub, risk_manager=None, notification_service=None):
         self.cfg = cfg
         self.state = state
         self.ex_hub = ex_hub
         self.risk_manager = risk_manager
+        self.notification_service = notification_service
 
     async def evaluate(self, intent: Dict[str, Any]) -> RiskDecision:
         tenant_id = str(intent.get("tenant_id") or getattr(self.ex_hub, "tenant_id", "default"))
@@ -137,21 +140,33 @@ class RiskPolicy:
         return free
 
     def _block(self, tenant_id, exchange, symbol, rule_type, rule_value, attempted_value, reason, client_order_id, event="RISK_CHECK_BLOCKED"):
-        self._record(
-            {
-                "tenant_id": tenant_id,
-                "exchange": exchange,
-                "symbol": symbol,
-                "rule_type": rule_type,
-                "rule_value": rule_value,
-                "attempted_value": attempted_value,
-                "decision": "BLOCKED",
-                "reason": reason,
-                "client_order_id": client_order_id,
-                "timestamp": time.time(),
-            },
-            event,
-        )
+        payload = {
+            "tenant_id": tenant_id,
+            "exchange": exchange,
+            "symbol": symbol,
+            "rule_type": rule_type,
+            "rule_value": rule_value,
+            "attempted_value": attempted_value,
+            "decision": "BLOCKED",
+            "reason": reason,
+            "client_order_id": client_order_id,
+            "timestamp": time.time(),
+        }
+        self._record(payload, event)
+        if rule_type == "KILL_SWITCH" and self.notification_service is not None:
+            self.notification_service.notify_nowait(
+                tenant_id=tenant_id,
+                event_type=NotificationEventType.KILL_SWITCH_ACTIVATED,
+                severity=NotificationSeverity.ERROR,
+                payload={
+                    "symbol": symbol,
+                    "exchange": exchange,
+                    "amount": 0,
+                    "price": 0,
+                    "reason": reason,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+            )
         return RiskDecision(False, reason=reason, rule_type=rule_type, rule_value=float(rule_value or 0.0), attempted_value=float(attempted_value or 0.0))
 
     def _record(self, payload: Dict[str, Any], event_type: str):

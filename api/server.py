@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request, send_from_directory, abort, g
 
 from app.version import APP_VERSION
 from api.exchange_credentials_api import exchange_credentials_bp
+from api.notifications_api import notifications_bp
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ STATIC_DIR = STATIC_DIR if os.path.isdir(STATIC_DIR) else None
 
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static" if STATIC_DIR else None)
 app.register_blueprint(exchange_credentials_bp)
+app.register_blueprint(notifications_bp)
 
 
 def _safe_send(base_dir: str, filename: str):

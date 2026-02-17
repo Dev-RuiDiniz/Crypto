@@ -294,6 +294,21 @@ class StateStore:
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS notification_settings (
+                tenant_id TEXT PRIMARY KEY,
+                email_enabled INTEGER NOT NULL DEFAULT 0,
+                email_recipients TEXT NOT NULL DEFAULT '[]',
+                webhook_enabled INTEGER NOT NULL DEFAULT 0,
+                webhook_url TEXT,
+                min_severity TEXT NOT NULL DEFAULT 'INFO',
+                enabled_events TEXT NOT NULL DEFAULT '[]',
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS paper_orders (
                 id TEXT PRIMARY KEY,
                 ts REAL,
