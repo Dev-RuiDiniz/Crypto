@@ -42,10 +42,31 @@ CONFIG_PATH = os.path.join(PROJECT_ROOT, "config.txt")
 _DB_PATH_OVERRIDE: Optional[str] = None
 
 
+def _normalize_db_path(db_path: str) -> str:
+    resolved = os.path.abspath(os.path.expanduser(str(db_path).strip()))
+    db_dir = os.path.dirname(resolved)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    return resolved
+
+
+def _ts_to_iso8601(ts: Optional[float]) -> Optional[str]:
+    if not ts:
+        return None
+    return datetime.utcfromtimestamp(float(ts)).isoformat(timespec="seconds") + "Z"
+
+
+def _classify_worker_status(last_heartbeat_at: Optional[float], stale_after_sec: int) -> str:
+    if not last_heartbeat_at:
+        return "down"
+    age_sec = time.time() - float(last_heartbeat_at)
+    return "ok" if age_sec <= stale_after_sec else "stale"
+
+
 def set_db_path_override(db_path: Optional[str]) -> None:
     global _DB_PATH_OVERRIDE
     if db_path:
-        _DB_PATH_OVERRIDE = os.path.abspath(db_path)
+        _DB_PATH_OVERRIDE = _normalize_db_path(db_path)
         logger.info("[BOOT] DB_PATH=%s", _DB_PATH_OVERRIDE)
 
 
@@ -55,7 +76,7 @@ def get_effective_db_path() -> str:
 
 def _resolve_sqlite_path(cfg: Optional[ConfigParser] = None) -> str:
     if _DB_PATH_OVERRIDE:
-        return os.path.abspath(_DB_PATH_OVERRIDE)
+        return _normalize_db_path(_DB_PATH_OVERRIDE)
     cfg = cfg or _load_config()
     if cfg.has_section("GLOBAL"):
         gsect = cfg["GLOBAL"]
@@ -65,8 +86,8 @@ def _resolve_sqlite_path(cfg: Optional[ConfigParser] = None) -> str:
         gsect = {}
     sqlite_cfg = (gsect.get("SQLITE_PATH", "./data/state.db") or "./data/state.db").strip()
     if not os.path.isabs(sqlite_cfg):
-        return os.path.normpath(os.path.join(PROJECT_ROOT, sqlite_cfg))
-    return os.path.normpath(sqlite_cfg)
+        return _normalize_db_path(os.path.normpath(os.path.join(PROJECT_ROOT, sqlite_cfg)))
+    return _normalize_db_path(os.path.normpath(sqlite_cfg))
 
 
 # ================== INTEGRAÇÃO COM ESTADO COMPARTILHADO (API ↔ BOT) ==================
@@ -868,23 +889,66 @@ def upsert_bot_config(payload: Dict[str, Any]):
 
 def get_db_health() -> Dict[str, Any]:
     db_path = get_effective_db_path()
-    writable = False
+    connect_ok = False
+    write_ok = False
+
     try:
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         conn = sqlite3.connect(db_path)
-        conn.execute("CREATE TABLE IF NOT EXISTS runtime_status (worker_pid INTEGER, started_at REAL, last_heartbeat_at REAL, db_path TEXT, version TEXT)")
+        conn.row_factory = sqlite3.Row
+        connect_ok = True
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runtime_status (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                worker_pid INTEGER,
+                started_at REAL,
+                last_heartbeat_at REAL,
+                db_path TEXT,
+                version TEXT
+            )
+            """
+        )
+        conn.execute("DELETE FROM runtime_status WHERE COALESCE(id, 1) = 1")
+        conn.execute(
+            """
+            INSERT INTO runtime_status(id, db_path)
+            VALUES (1, ?)
+            """,
+            (db_path,),
+        )
         conn.commit()
-        conn.close()
-        writable = True
+        write_ok = True
     except Exception as exc:
-        logger.warning("[health/db] writable check failed: %s", exc)
-    return {"status": "ok", "db_path": db_path, "writable": writable}
+        logger.warning("[health/db] check failed: %s", exc, exc_info=True)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    return {
+        "status": "ok" if connect_ok and write_ok else "degraded",
+        "db_path": db_path,
+        "writable": bool(connect_ok and write_ok),
+        "checks": {
+            "connect": connect_ok,
+            "write": write_ok,
+        },
+    }
 
 
 def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
     db_path = get_effective_db_path()
+    result = {
+        "status": "down",
+        "worker_pid": None,
+        "last_heartbeat_at": None,
+        "db_path": db_path,
+        "stale_after_sec": int(stale_after_sec),
+    }
+
     if not os.path.exists(db_path):
-        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+        return result
 
     try:
         conn = sqlite3.connect(db_path)
@@ -893,27 +957,36 @@ def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
             """
             SELECT worker_pid, started_at, last_heartbeat_at, db_path, version
             FROM runtime_status
+            WHERE COALESCE(id, 1) = 1
             ORDER BY COALESCE(last_heartbeat_at, 0) DESC
             LIMIT 1
             """
         ).fetchone()
-        conn.close()
     except Exception as exc:
-        logger.warning("[health/worker] query failed: %s", exc)
-        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+        logger.warning("[health/worker] query failed: %s", exc, exc_info=True)
+        return result
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     if row is None:
-        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+        return result
 
     last_hb = float(row["last_heartbeat_at"] or 0.0)
-    worker_pid = int(row["worker_pid"] or 0)
-    is_stale = (time.time() - last_hb) > stale_after_sec
-    return {
-        "status": "stale" if is_stale else "ok",
-        "last_heartbeat_at": last_hb,
-        "worker_pid": worker_pid,
-        "started_at": float(row["started_at"] or 0.0),
-    }
+    worker_pid = int(row["worker_pid"] or 0) or None
+    result.update(
+        {
+            "status": _classify_worker_status(last_hb, stale_after_sec=stale_after_sec),
+            "worker_pid": worker_pid,
+            "last_heartbeat_at": _ts_to_iso8601(last_hb),
+            "db_path": str(row["db_path"] or db_path),
+            "version": str(row["version"] or ""),
+            "started_at": _ts_to_iso8601(float(row["started_at"] or 0.0)),
+        }
+    )
+    return result
 
 
 def debug_snapshot() -> Dict[str, Any]:
