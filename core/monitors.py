@@ -248,6 +248,7 @@ class MainMonitor:
 
         self._last_snapshot_json: str = ""
         self._last_open_orders_snapshot: List[Dict[str, Any]] = []
+        self._marketdata_rows: List[Dict[str, Any]] = []
 
         ulog.info(f"[MONITOR] snapshot_path configurado para: {self.snapshot_path}")
 
@@ -978,6 +979,7 @@ class MainMonitor:
                 "closed": [],
             },
             "events": list(self._events[-self._events_max:]),
+            "orderbook_status": list(self._marketdata_rows),
         }
 
         # ---------- balances ----------
@@ -1342,6 +1344,13 @@ class MainMonitor:
                     log.warning(
                         f"[snapshot] erro ao atualizar lista de ordens abertas: {e}"
                     )
+
+                try:
+                    md = getattr(self.ex_hub, "market_data", None)
+                    if md is not None:
+                        self._marketdata_rows = await md.get_status_rows()
+                except Exception as e:
+                    log.warning(f"[snapshot] erro ao atualizar marketdata status: {e}")
 
                 try:
                     self._publish_snapshot(ref_map, mids_map)

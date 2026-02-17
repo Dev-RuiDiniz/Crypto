@@ -76,6 +76,7 @@ class OrderRouter:
 
         # Cache de saldos
         self.balance_ttl = float(self.cfg.get("ROUTER", "BALANCE_TTL_SEC", fallback="8"))
+        self.marketdata_stale_ms = int(self.cfg.get("MARKETDATA", "WS_STALE_MS", fallback="3000"))
         self._balance_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 
         # Estrutura: orders[pair][ex_name][side] = {...}
@@ -173,7 +174,24 @@ class OrderRouter:
 
     async def _best_ask_usdt(self, ex_name: str, symbol_local: str) -> Optional[float]:
         try:
-            ob = await self.ex_hub.get_orderbook(ex_name, symbol_local, limit=1)
+            if hasattr(self.ex_hub, "get_orderbook_meta"):
+                meta = await self.ex_hub.get_orderbook_meta(ex_name, symbol_local)
+            else:
+                ob = await self.ex_hub.get_orderbook(ex_name, symbol_local, limit=1)
+                meta = {"snapshot": ob, "ageMs": 0, "source": "POLL", "state": "DEGRADED"}
+            age_ms = int(meta.get("ageMs") or 0)
+            if age_ms > int(self.marketdata_stale_ms):
+                log.warning(
+                    "MARKETDATA_STALE_BLOCK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
+                    getattr(self.ex_hub, "tenant_id", "default"),
+                    ex_name,
+                    symbol_local,
+                    age_ms,
+                    meta.get("source"),
+                    meta.get("state"),
+                )
+                return None
+            ob = meta.get("snapshot") or {}
             if ob and ob.get("asks"):
                 ask_local = float(ob["asks"][0][0])
                 return self.ex_hub.to_usdt(ex_name, symbol_local, ask_local)
@@ -183,7 +201,24 @@ class OrderRouter:
 
     async def _best_bid_usdt(self, ex_name: str, symbol_local: str) -> Optional[float]:
         try:
-            ob = await self.ex_hub.get_orderbook(ex_name, symbol_local, limit=1)
+            if hasattr(self.ex_hub, "get_orderbook_meta"):
+                meta = await self.ex_hub.get_orderbook_meta(ex_name, symbol_local)
+            else:
+                ob = await self.ex_hub.get_orderbook(ex_name, symbol_local, limit=1)
+                meta = {"snapshot": ob, "ageMs": 0, "source": "POLL", "state": "DEGRADED"}
+            age_ms = int(meta.get("ageMs") or 0)
+            if age_ms > int(self.marketdata_stale_ms):
+                log.warning(
+                    "MARKETDATA_STALE_BLOCK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
+                    getattr(self.ex_hub, "tenant_id", "default"),
+                    ex_name,
+                    symbol_local,
+                    age_ms,
+                    meta.get("source"),
+                    meta.get("state"),
+                )
+                return None
+            ob = meta.get("snapshot") or {}
             if ob and ob.get("bids"):
                 bid_local = float(ob["bids"][0][0])
                 return self.ex_hub.to_usdt(ex_name, symbol_local, bid_local)

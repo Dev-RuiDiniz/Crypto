@@ -1201,6 +1201,29 @@ def get_config_status(stale_after_sec: int = 30) -> Dict[str, Any]:
         conn.close()
 
 
+
+
+def get_marketdata_orderbook_status(tenant_id: str, exchange: str = "", symbol: str = "") -> Dict[str, Any]:
+    snap = _load_snapshot()
+    rows = snap.get("orderbook_status") or []
+    out: List[Dict[str, Any]] = []
+    exchange = str(exchange or "").strip().lower()
+    symbol = str(symbol or "").strip().upper()
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ex = str(row.get("exchange") or "").lower()
+        sym = str(row.get("symbol") or "").upper()
+        if exchange and ex != exchange:
+            continue
+        if symbol and sym != symbol:
+            continue
+        out.append(row)
+
+    return {"tenantId": tenant_id, "items": out}
+
+
 def debug_snapshot() -> Dict[str, Any]:
     """
     Endpoint de debug para inspecionar rapidamente o snapshot em memória/arquivo.

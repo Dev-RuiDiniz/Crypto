@@ -22,6 +22,7 @@ from app.pathing import ConfigResolutionError, get_work_dir, resolve_config_path
 from app.version import APP_VERSION
 from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
 from core.audit_log_service import AuditLogService
+from core.market_data import MarketDataService
 
 APP_NAME = "ARBIT"
 log = get_logger(APP_NAME)         # técnico -> arquivo detalhado
@@ -333,6 +334,8 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
     credentials_service = ExchangeCredentialsService(cfg)
     _ = AuditLogService(cfg)
     ex_hub = ExchangeHub(cfg, credentials_service=credentials_service, tenant_id=tenant_id)
+    market_data = MarketDataService(cfg, ex_hub, tenant_id=tenant_id)
+    ex_hub.market_data = market_data
     try:
         await ex_hub.connect_all()
     except CredentialsNotFoundError as e:
@@ -471,6 +474,8 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         raise
 
     try:
+        pairs_cfg = [s.strip().upper() for s in cfg.get("PAIRS", "LIST", fallback="").split(",") if s.strip()]
+        await market_data.start(pairs_cfg)
         ulog.info("✅ Sistema pronto. Iniciando monitoramento...")
         await monitor.run()
     except KeyboardInterrupt:
@@ -482,6 +487,7 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         raise
     finally:
         ulog.info("🔄 Encerrando conexões...")
+        await market_data.stop()
         await ex_hub.close_all()
         log.info("Finalizado.")
         ulog.info("✅ Finalizado.")
