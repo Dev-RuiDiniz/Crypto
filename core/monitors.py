@@ -280,12 +280,18 @@ class MainMonitor:
 
     def _pair_spreads_from_cfg(self, pair: str) -> Tuple[float, float]:
         """
-        Resolve (buy_spread, sell_spread) para o par:
-        1) [SPREAD] <PAIR>_BUY_PCT / <PAIR>_SELL_PCT
-        2) [SPREAD] <PAIR>
-        3) [SPREAD] BUY_PCT / SELL_PCT
-        4) fallback 0.10/0.10
+        Resolve spread no DB (pair_spread_config) e cai para config.txt por compatibilidade.
         """
+        tenant_id = getattr(self.ex_hub, "tenant_id", "default")
+        if hasattr(self.state, "get_pair_spread_config"):
+            try:
+                spread_cfg = self.state.get_pair_spread_config(tenant_id, pair)
+                if spread_cfg and bool(spread_cfg.get("enabled", True)):
+                    pct = max(0.0, float(spread_cfg.get("percent") or 0.0)) / 100.0
+                    return pct, pct
+            except Exception as exc:
+                log.warning("[spread_config] falha ao carregar do DB para %s: %s", pair, exc)
+
         sect = "SPREAD"
         p = pair.strip().upper()
 

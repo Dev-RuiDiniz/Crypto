@@ -294,6 +294,20 @@ class StateStore:
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS pair_spread_config (
+                tenant_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                percent REAL NOT NULL DEFAULT 1.0,
+                side_policy TEXT NOT NULL DEFAULT 'BOTH',
+                repricing_interval_ms INTEGER,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (tenant_id, symbol)
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS notification_settings (
                 tenant_id TEXT PRIMARY KEY,
                 email_enabled INTEGER NOT NULL DEFAULT 0,
@@ -634,6 +648,26 @@ class StateStore:
                 }
             )
         return out
+
+
+    def get_pair_spread_config(self, tenant_id: str, symbol: str) -> Dict[str, Any]:
+        row = self._conn.execute(
+            """
+            SELECT enabled, percent, side_policy, repricing_interval_ms, updated_at
+            FROM pair_spread_config
+            WHERE tenant_id = ? AND symbol = ?
+            """,
+            (str(tenant_id or "default"), self._normalize_symbol(symbol)),
+        ).fetchone()
+        if not row:
+            return {"enabled": True, "percent": 1.0, "side_policy": "BOTH", "repricing_interval_ms": None, "updated_at": None}
+        return {
+            "enabled": bool(row["enabled"] if isinstance(row, sqlite3.Row) else row[0]),
+            "percent": float((row["percent"] if isinstance(row, sqlite3.Row) else row[1]) or 0.0),
+            "side_policy": str((row["side_policy"] if isinstance(row, sqlite3.Row) else row[2]) or "BOTH"),
+            "repricing_interval_ms": (row["repricing_interval_ms"] if isinstance(row, sqlite3.Row) else row[3]),
+            "updated_at": (row["updated_at"] if isinstance(row, sqlite3.Row) else row[4]),
+        }
 
     def get_enabled_bot_configs(self) -> List[Dict[str, Any]]:
         """
