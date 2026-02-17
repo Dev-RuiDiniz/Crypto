@@ -135,3 +135,15 @@ Recomendação: validar primeiro em PAPER (`docs/12-paper-vs-live.md`).
 - `AUDITORIA_PROJETO.md` (raiz)
 - README atualizado
 - Estrutura de documentação padronizada em `/docs/00..12`
+
+
+## Gestão de Risco
+
+A criação de ordens agora é protegida por uma `RiskPolicy` central obrigatória (Sprint 8), com limites por par para:
+- % máximo do saldo por operação
+- valor absoluto máximo por operação
+- máximo de ordens abertas
+- máximo de exposição
+- kill switch global e por par
+
+Bloqueios ficam persistidos em `risk_events` e podem ser consultados via API para o dashboard.

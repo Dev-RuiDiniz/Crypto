@@ -26,14 +26,16 @@ except Exception:
     Adapters = None  # fallback silencioso (sem quantização se não houver)
 
 Key = Tuple[str, str, str]  # (ex_name, pair, side)
+from core.risk_policy import RiskPolicy
 
 
 class OrderManager:
-    def __init__(self, cfg: configparser.ConfigParser, ex_hub, state, risk):
+    def __init__(self, cfg: configparser.ConfigParser, ex_hub, state, risk, risk_policy=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.state = state
         self.risk = risk
+        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk)
 
         # registro simples em memória
         self._live: Dict[Key, LiveOrder] = {}
@@ -216,6 +218,18 @@ class OrderManager:
                 except Exception:
                     pass
 
+            decision = await self.risk_policy.evaluate({
+                "tenant_id": str(getattr(self.ex_hub, "tenant_id", "default")),
+                "exchange": ex_name,
+                "symbol": pair,
+                "side": side,
+                "amount": float(amount_q),
+                "price_usdt": float(price_usdt),
+                "symbol_local": symbol_local,
+            })
+            if not decision.allowed:
+                log.warning(f"[RISK_BLOCKED] {pair} {side.upper()} @ {ex_name} rule={decision.rule_type} reason={decision.reason}")
+                return
             resp = await self.ex_hub.create_limit_order(
                 ex_name=ex_name,
                 global_pair=pair,
@@ -241,7 +255,7 @@ class OrderManager:
             self._last_ts[key] = time.time()
 
             log.info(
-                f"[CREATE] {pair} {side.UPPER()} @ {ex_name} {symbol_local} "
+                f"[CREATE] {pair} {side.upper()} @ {ex_name} {symbol_local} "
                 f"price_local={price_local_q:.8f} amount={amount_q:.8f} id={order_id} note={getattr(p,'note','') or ''}"
             )
 

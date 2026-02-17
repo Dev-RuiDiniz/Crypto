@@ -17,6 +17,7 @@ log = get_logger("router")          # técnico -> arquivo detalhado
 ulog = get_user_logger("router")    # humano -> console (opcional)
 
 from exchanges.adapters import Adapters, ceil_step
+from core.risk_policy import RiskPolicy
 
 
 class OrderRouter:
@@ -33,12 +34,13 @@ class OrderRouter:
     - Mantém roteamento por alvos em USDT (modo antigo)
     """
 
-    def __init__(self, cfg: configparser.ConfigParser, ex_hub, portfolio, risk, state):
+    def __init__(self, cfg: configparser.ConfigParser, ex_hub, portfolio, risk, state, risk_policy=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.portfolio = portfolio
         self.risk = risk
         self.state = state
+        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk)
 
         self.adapters = Adapters(cfg, ex_hub)
 
@@ -773,6 +775,19 @@ class OrderRouter:
                     cycle_id=str(cycle_id or ""),
                 )
                 dedupe_state = str(state_row.get("dedupe_state") or "NEW")
+                decision = await self.risk_policy.evaluate({
+                    "tenant_id": str(getattr(self.ex_hub, "tenant_id", "default")),
+                    "exchange": ex_name,
+                    "symbol": pair,
+                    "side": side_l,
+                    "amount": float(qty_local),
+                    "price_usdt": float(price_usdt),
+                    "symbol_local": symbol_local,
+                    "client_order_id": client_order_id,
+                })
+                if not decision.allowed:
+                    log.warning(f"[{pair}] blocked by RiskPolicy ex={ex_name} side={side_l} rule={decision.rule_type} reason={decision.reason}")
+                    return {"id": "", "status": "blocked", "clientOrderId": client_order_id, "error": decision.reason, "rule_type": decision.rule_type}
                 if not bool(state_row.get("should_submit", True)):
                     log.info(
                         f"[{pair}] dedupe_state={dedupe_state} skip create ex={ex_name} side={side_l} coid={self._short_client_order_id(client_order_id)}"

@@ -15,17 +15,19 @@ except Exception:
 
 
 log = get_logger("strategy_arbitrage")
+from core.risk_policy import RiskPolicy
 
 
 class StrategyArbitrageSimple:
     _locks: Dict[Tuple[str, str], asyncio.Lock] = {}
 
-    def __init__(self, cfg, ex_hub, state, risk, tenant_id: str = "default"):
+    def __init__(self, cfg, ex_hub, state, risk, tenant_id: str = "default", risk_policy=None):
         self.cfg = cfg
         self.ex_hub = ex_hub
         self.state = state
         self.risk = risk
         self.tenant_id = tenant_id
+        self.risk_policy = risk_policy or RiskPolicy(cfg, state, ex_hub, risk_manager=risk)
 
     @staticmethod
     def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -118,6 +120,18 @@ class StrategyArbitrageSimple:
         )
 
         dedupe_state = str(intent.get("dedupe_state") or "NEW")
+        decision = await self.risk_policy.evaluate({
+            "tenant_id": self.tenant_id,
+            "exchange": exchange,
+            "symbol": symbol,
+            "side": side,
+            "amount": float(amount),
+            "price_usdt": float(price_usdt),
+            "symbol_local": symbol_local,
+            "client_order_id": coid,
+        })
+        if not decision.allowed:
+            return {"id": "", "status": "blocked", "clientOrderId": coid, "error": decision.reason, "rule_type": decision.rule_type}
         if not bool(intent.get("should_submit", True)):
             return {
                 "id": str(intent.get("id") or ""),

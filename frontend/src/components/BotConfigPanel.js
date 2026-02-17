@@ -17,6 +17,7 @@ export function BotConfigPanel() {
   const [arbPair, setArbPair] = useState("");
   const [arbCfg, setArbCfg] = useState(null);
   const [arbStatus, setArbStatus] = useState(null);
+  const [riskEvents, setRiskEvents] = useState([]);
 
   const fmtTime = (isoValue) => {
     if (!isoValue) return "—";
@@ -41,6 +42,9 @@ export function BotConfigPanel() {
       });
       const status = await api.getConfigStatus();
       setConfigStatus(status);
+      const tenantId = (window.localStorage.getItem("tenantId") || "default");
+      const eventsRes = await api.getRiskEvents(tenantId, arbPair || (nextRows[0] && nextRows[0].pair) || "");
+      setRiskEvents(eventsRes.items || []);
     } catch (err) {
       toast(err.message || "Falha ao carregar configurações", true);
     } finally {
@@ -73,6 +77,11 @@ export function BotConfigPanel() {
     };
     loadArb();
   }, [arbPair, rows.length]);
+
+  useEffect(() => {
+    const tenantId = (window.localStorage.getItem("tenantId") || "default");
+    api.getRiskEvents(tenantId, arbPair || "").then((res) => setRiskEvents(res.items || [])).catch(() => setRiskEvents([]));
+  }, [arbPair]);
 
   const updateRow = (idx, key, value) => setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
 
@@ -138,7 +147,7 @@ export function BotConfigPanel() {
       e("h2", null, "Config por Par (DB)"),
       e("div", { className: "table-wrapper" },
         e("table", { className: "table" },
-          e("thead", null, e("tr", null, e("th", null, "Pair"), e("th", null, "Enabled"), e("th", null, "Strategy"), e("th", null, "Risk %"), e("th", null, "Max daily loss"), e("th", null, "Ações"))),
+          e("thead", null, e("tr", null, e("th", null, "Pair"), e("th", null, "Enabled"), e("th", null, "Strategy"), e("th", null, "Risk %"), e("th", null, "% saldo/trade"), e("th", null, "Max abs"), e("th", null, "Max ordens"), e("th", null, "Max exposição"), e("th", null, "Kill pair"), e("th", null, "Max daily loss"), e("th", null, "Ações"))),
           e("tbody", null,
             rows.map((row, idx) => e("tr", { key: row.pair || idx },
               e("td", null, e("input", { value: row.pair || "", onChange: (ev) => updateRow(idx, "pair", ev.target.value) })),
@@ -148,10 +157,34 @@ export function BotConfigPanel() {
                 e("option", { value: "StrategyArbitrageSimple" }, "StrategyArbitrageSimple")
               )),
               e("td", null, e("input", { type: "number", step: "0.01", value: row.risk_percentage || 0, onChange: (ev) => updateRow(idx, "risk_percentage", parseFloat(ev.target.value || "0") || 0) })),
+              e("td", null, e("input", { type: "number", step: "0.01", value: row.max_percent_per_trade || 0, onChange: (ev) => updateRow(idx, "max_percent_per_trade", parseFloat(ev.target.value || "0") || 0) })),
+              e("td", null, e("input", { type: "number", step: "0.01", value: row.max_absolute_per_trade || 0, onChange: (ev) => updateRow(idx, "max_absolute_per_trade", parseFloat(ev.target.value || "0") || 0) })),
+              e("td", null, e("input", { type: "number", value: row.max_open_orders_per_symbol || 0, onChange: (ev) => updateRow(idx, "max_open_orders_per_symbol", parseInt(ev.target.value || "0", 10) || 0) })),
+              e("td", null, e("input", { type: "number", step: "0.01", value: row.max_exposure_per_symbol || 0, onChange: (ev) => updateRow(idx, "max_exposure_per_symbol", parseFloat(ev.target.value || "0") || 0) })),
+              e("td", null, e("input", { type: "checkbox", checked: !!row.kill_switch_enabled, onChange: (ev) => updateRow(idx, "kill_switch_enabled", ev.target.checked) })),
               e("td", null, e("input", { type: "number", step: "0.01", value: row.max_daily_loss || 0, onChange: (ev) => updateRow(idx, "max_daily_loss", parseFloat(ev.target.value || "0") || 0) })),
               e("td", null, e("button", { className: "btn", onClick: () => saveRow(row) }, "Salvar"))
             )),
-            e("tr", { key: "new" }, e("td", { colSpan: 6 }, e("button", { className: "btn", onClick: () => setRows([...rows, { pair: "", enabled: true, strategy: "StrategySpread", risk_percentage: 0, max_daily_loss: 0 }]) }, "+ Adicionar par")))
+            e("tr", { key: "new" }, e("td", { colSpan: 11 }, e("button", { className: "btn", onClick: () => setRows([...rows, { pair: "", enabled: true, strategy: "StrategySpread", risk_percentage: 0, max_percent_per_trade: 0, max_absolute_per_trade: 0, max_open_orders_per_symbol: 0, max_exposure_per_symbol: 0, kill_switch_enabled: false, max_daily_loss: 0 }]) }, "+ Adicionar par")))
+          )
+        )
+      )
+    ),
+
+
+    e("div", { className: "panel" },
+      e("h2", null, "Bloqueios recentes", riskEvents.length > 0 ? e("span", { className: "badge" }, ` Risk Blocked (${riskEvents.length})`) : null),
+      e("div", { className: "table-wrapper" },
+        e("table", { className: "table" },
+          e("thead", null, e("tr", null, e("th", null, "Horário"), e("th", null, "Regra"), e("th", null, "Valor Tentado"), e("th", null, "Limite"), e("th", null, "Motivo"))),
+          e("tbody", null,
+            riskEvents.filter((ev) => ev.decision === "BLOCKED").slice(0, 20).map((ev) => e("tr", { key: `${ev.id}` },
+              e("td", null, new Date((ev.timestamp || 0) * 1000).toLocaleString("pt-BR")),
+              e("td", null, ev.rule_type || "—"),
+              e("td", null, ev.attempted_value || 0),
+              e("td", null, ev.rule_value || 0),
+              e("td", null, ev.reason || "—")
+            ))
           )
         )
       )

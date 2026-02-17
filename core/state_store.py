@@ -61,6 +61,11 @@ class StateStore:
                 enabled INTEGER NOT NULL DEFAULT 1,
                 strategy TEXT,
                 risk_percentage REAL,
+                max_percent_per_trade REAL,
+                max_absolute_per_trade REAL,
+                max_open_orders_per_symbol INTEGER,
+                max_exposure_per_symbol REAL,
+                kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
                 max_daily_loss REAL,
                 updated_at REAL
             )
@@ -110,8 +115,42 @@ class StateStore:
             cur.execute("ALTER TABLE config_pairs ADD COLUMN strategy TEXT")
         if "risk_percentage" not in existing_cols:
             cur.execute("ALTER TABLE config_pairs ADD COLUMN risk_percentage REAL")
+        if "max_percent_per_trade" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN max_percent_per_trade REAL")
+        if "max_absolute_per_trade" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN max_absolute_per_trade REAL")
+        if "max_open_orders_per_symbol" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN max_open_orders_per_symbol INTEGER")
+        if "max_exposure_per_symbol" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN max_exposure_per_symbol REAL")
+        if "kill_switch_enabled" not in existing_cols:
+            cur.execute("ALTER TABLE config_pairs ADD COLUMN kill_switch_enabled INTEGER NOT NULL DEFAULT 0")
         if "max_daily_loss" not in existing_cols:
             cur.execute("ALTER TABLE config_pairs ADD COLUMN max_daily_loss REAL")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS risk_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                exchange TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                rule_type TEXT NOT NULL,
+                rule_value REAL,
+                attempted_value REAL,
+                decision TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                client_order_id TEXT,
+                timestamp REAL NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_risk_events_tenant_symbol_ts
+            ON risk_events (tenant_id, symbol, timestamp DESC)
+            """
+        )
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS orders (
@@ -541,6 +580,11 @@ class StateStore:
                     symbol,
                     COALESCE(strategy, 'StrategySpread') AS strategy,
                     COALESCE(risk_percentage, 0) AS risk_percentage,
+                    COALESCE(max_percent_per_trade, 0) AS max_percent_per_trade,
+                    COALESCE(max_absolute_per_trade, 0) AS max_absolute_per_trade,
+                    COALESCE(max_open_orders_per_symbol, 0) AS max_open_orders_per_symbol,
+                    COALESCE(max_exposure_per_symbol, 0) AS max_exposure_per_symbol,
+                    COALESCE(kill_switch_enabled, 0) AS kill_switch_enabled,
                     COALESCE(max_daily_loss, 0) AS max_daily_loss,
                     COALESCE(enabled, 1) AS enabled,
                     updated_at
@@ -564,9 +608,14 @@ class StateStore:
                     "pair": pair,
                     "strategy": str((row["strategy"] if isinstance(row, sqlite3.Row) else row[1]) or "StrategySpread"),
                     "risk_percentage": float((row["risk_percentage"] if isinstance(row, sqlite3.Row) else row[2]) or 0.0),
-                    "max_daily_loss": float((row["max_daily_loss"] if isinstance(row, sqlite3.Row) else row[3]) or 0.0),
-                    "enabled": bool((row["enabled"] if isinstance(row, sqlite3.Row) else row[4]) or 0),
-                    "updated_at": float((row["updated_at"] if isinstance(row, sqlite3.Row) else row[5]) or 0.0),
+                    "max_percent_per_trade": float((row["max_percent_per_trade"] if isinstance(row, sqlite3.Row) else row[3]) or 0.0),
+                    "max_absolute_per_trade": float((row["max_absolute_per_trade"] if isinstance(row, sqlite3.Row) else row[4]) or 0.0),
+                    "max_open_orders_per_symbol": int((row["max_open_orders_per_symbol"] if isinstance(row, sqlite3.Row) else row[5]) or 0),
+                    "max_exposure_per_symbol": float((row["max_exposure_per_symbol"] if isinstance(row, sqlite3.Row) else row[6]) or 0.0),
+                    "kill_switch_enabled": bool((row["kill_switch_enabled"] if isinstance(row, sqlite3.Row) else row[7]) or 0),
+                    "max_daily_loss": float((row["max_daily_loss"] if isinstance(row, sqlite3.Row) else row[8]) or 0.0),
+                    "enabled": bool((row["enabled"] if isinstance(row, sqlite3.Row) else row[9]) or 0),
+                    "updated_at": float((row["updated_at"] if isinstance(row, sqlite3.Row) else row[10]) or 0.0),
                 }
             )
         return out
@@ -1228,6 +1277,60 @@ class StateStore:
             ]
         except Exception as e:
             log.warning(f"[orders][open_select] falha: {e}")
+            return []
+
+
+    def record_risk_event(self, payload: Dict[str, Any]) -> None:
+        try:
+            self._conn.execute(
+                """
+                INSERT INTO risk_events
+                (tenant_id, exchange, symbol, rule_type, rule_value, attempted_value, decision, reason, client_order_id, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(payload.get("tenant_id") or "default"),
+                    str(payload.get("exchange") or ""),
+                    str(payload.get("symbol") or ""),
+                    str(payload.get("rule_type") or "UNKNOWN"),
+                    payload.get("rule_value"),
+                    payload.get("attempted_value"),
+                    str(payload.get("decision") or "BLOCKED"),
+                    str(payload.get("reason") or ""),
+                    str(payload.get("client_order_id") or ""),
+                    float(payload.get("timestamp") or time.time()),
+                ),
+            )
+            self._conn.commit()
+        except Exception as e:
+            log.warning(f"[risk_events][insert] falha: {e}")
+
+    def get_risk_events(self, tenant_id: str = "default", symbol: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            cur = self._conn.cursor()
+            if symbol:
+                rows = cur.execute(
+                    """
+                    SELECT * FROM risk_events
+                    WHERE tenant_id = ? AND UPPER(symbol) = UPPER(?)
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (str(tenant_id or "default"), str(symbol), int(limit)),
+                ).fetchall()
+            else:
+                rows = cur.execute(
+                    """
+                    SELECT * FROM risk_events
+                    WHERE tenant_id = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (str(tenant_id or "default"), int(limit)),
+                ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            log.warning(f"[risk_events][select] falha: {e}")
             return []
 
     def get_order_by_id(self, order_id: str) -> Optional[Dict[str, Any]]:
