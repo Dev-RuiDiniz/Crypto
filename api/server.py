@@ -256,6 +256,11 @@ def api_events():
     return jsonify(handlers.get_events())
 
 
+@app.route("/api/tenants/<tenantId>/marketdata/orderbook-status")
+def api_marketdata_orderbook_status(tenantId: str):
+    exchange = request.args.get("exchange", "")
+    symbol = request.args.get("symbol", "")
+    return jsonify(handlers.get_marketdata_orderbook_status(tenantId, exchange=exchange, symbol=symbol))
 
 
 @app.errorhandler(500)

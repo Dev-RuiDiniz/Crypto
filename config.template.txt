@@ -144,6 +144,13 @@ mexc.sol/usdt.sell = SOL/USDT
 mercadobitcoin.sol/usdt.buy = SOL/BRL
 mercadobitcoin.sol/usdt.sell = SOL/BRL
 
+
+[MARKETDATA]
+ws_stale_ms = 3000
+ws_reconnect_ms = 5000
+poll_interval_ms = 2000
+orderbook_limit = 20
+
 [ROUTER]
 anchor_mode = LOCAL
 sticky_per_side = true

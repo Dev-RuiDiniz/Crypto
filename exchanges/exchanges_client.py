@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import configparser
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, List, Iterable, Set
 
@@ -130,6 +131,7 @@ class ExchangeHub:
         )
         self._markets_loaded: Dict[str, bool] = {}
         self.symbol_map = self._build_symbol_map()
+        self.market_data = None
 
         # Adapter nativo MB v4 (privadas)
         self.mb_v4: Optional[MBV4Adapter] = None
@@ -528,7 +530,7 @@ class ExchangeHub:
 
         return await _do()
 
-    async def get_orderbook(self, ex_name: str, symbol_local: str, limit: int = 10) -> Dict[str, Any]:
+    async def raw_fetch_orderbook(self, ex_name: str, symbol_local: str, limit: int = 10) -> Dict[str, Any]:
         ex = self.exchanges[ex_name]
         deco = _get_retry_deco(self.max_retries, self.retry_backoff_ms)
 
@@ -537,6 +539,30 @@ class ExchangeHub:
             return await ex.fetch_order_book(symbol_local, limit=limit)
 
         return await _do()
+
+    async def get_orderbook(self, ex_name: str, symbol_local: str, limit: int = 10) -> Dict[str, Any]:
+        if self.market_data is not None:
+            row = await self.market_data.get_order_book(self.tenant_id, ex_name, symbol_local)
+            snap = row.get("snapshot") or {}
+            if isinstance(snap, dict):
+                return snap
+        return await self.raw_fetch_orderbook(ex_name, symbol_local, limit=limit)
+
+    async def get_orderbook_meta(self, ex_name: str, symbol_local: str) -> Dict[str, Any]:
+        if self.market_data is not None:
+            return await self.market_data.get_order_book(self.tenant_id, ex_name, symbol_local)
+        ob = await self.raw_fetch_orderbook(ex_name, symbol_local, limit=1)
+        now_ms = int(time.time() * 1000)
+        return {
+            "snapshot": ob,
+            "timestamp": now_ms,
+            "source": "POLL",
+            "state": "DEGRADED",
+            "seq": 1,
+            "lastError": "",
+            "ageMs": 0,
+            "stale": False,
+        }
 
     async def get_mid_price_usdt(self, ex_name: str, symbol_local: str) -> Optional[float]:
         q = await self.get_ticker(ex_name, symbol_local)

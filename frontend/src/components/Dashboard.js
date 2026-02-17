@@ -31,6 +31,7 @@ export function Dashboard(props) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const [error, setError] = useState(null);
+  const [orderbookStatus, setOrderbookStatus] = useState([]);
 
   // Loop de atualização
   useEffect(() => {
@@ -45,13 +46,15 @@ export function Dashboard(props) {
           ordersPendingJson,
           ordersOpenJson,
           ordersClosedJson,
-          midsJson
+          midsJson,
+          obStatusJson
         ] = await Promise.all([
           fetchJson(`${API_BASE}/balances`),
           fetchJson(`${API_BASE}/orders?state=pending`),
           fetchJson(`${API_BASE}/orders?state=open`),
           fetchJson(`${API_BASE}/orders?state=closed`),
-          fetchJson(`${API_BASE}/mids?pair=${encodeURIComponent(pair)}`)
+          fetchJson(`${API_BASE}/mids?pair=${encodeURIComponent(pair)}`),
+          fetchJson(`${API_BASE}/tenants/default/marketdata/orderbook-status`)
         ]);
 
         if (cancelled) return;
@@ -61,6 +64,7 @@ export function Dashboard(props) {
         setOrdersOpen((ordersOpenJson && ordersOpenJson.orders) || []);
         setOrdersClosed((ordersClosedJson && ordersClosedJson.orders) || []);
         setMids((midsJson && midsJson.mids) || {});
+        setOrderbookStatus((obStatusJson && obStatusJson.items) || []);
         setError(null);
 
         if (!hasLoadedOnce) {
@@ -229,6 +233,48 @@ export function Dashboard(props) {
     );
   }
 
+
+
+  function renderMarketDataPanel() {
+    if (!orderbookStatus.length) {
+      return e("div", { className: "panel" }, e("h2", null, "Market Data"), e("p", { className: "panel-subtitle" }, "Sem status de order book ainda."));
+    }
+
+    return e(
+      "div",
+      { className: "panel" },
+      e("h2", null, "Market Data (Order Book)"),
+      e(
+        "div",
+        { className: "table-wrapper" },
+        e(
+          "table",
+          { className: "table table--wide" },
+          e("thead", null, e("tr", null,
+            e("th", null, "Exchange"),
+            e("th", null, "Par"),
+            e("th", null, "Fonte"),
+            e("th", null, "Estado"),
+            e("th", null, "Idade"),
+            e("th", null, "Best Bid"),
+            e("th", null, "Best Ask")
+          )),
+          e("tbody", null,
+            orderbookStatus.map((row, idx) => e("tr", { key: `${row.exchange}-${row.symbol}-${idx}` },
+              e("td", null, row.exchange || "—"),
+              e("td", null, row.symbol || "—"),
+              e("td", null, row.source || "—"),
+              e("td", null, row.state || "—"),
+              e("td", { className: "numeric" }, row.ageMs == null ? "—" : `${row.ageMs} ms`),
+              e("td", { className: "numeric" }, row.bestBid && row.bestBid.price != null ? `${formatNum(row.bestBid.price, 6)} (${formatNum(row.bestBid.qty, 4)})` : "—"),
+              e("td", { className: "numeric" }, row.bestAsk && row.bestAsk.price != null ? `${formatNum(row.bestAsk.price, 6)} (${formatNum(row.bestAsk.qty, 4)})` : "—")
+            ))
+          )
+        )
+      )
+    );
+  }
+
   function renderOrdersPanel() {
     let rows = [];
     if (activeOrdersTab === "pending") rows = ordersPending;
@@ -365,7 +411,8 @@ export function Dashboard(props) {
           e("div", { className: "panel-header" }, e("h2", null, "Saldos por corretora")),
           renderBalances()
         ),
-        renderMidsPanel()
+        renderMidsPanel(),
+        renderMarketDataPanel()
       )
     )
   );
