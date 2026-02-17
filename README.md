@@ -14,8 +14,9 @@ O **ARBIT** é um bot de trading spot com:
 
 ### Suporte atual do cliente
 - **Multi-pair simultâneo**: suportado (loop por par no mesmo ciclo).
-- **Config por par (`risk_percentage`) sem restart**: suportado no worker com recarga periódica de `config_pairs` (respeitando `BOT_CONFIG_CACHE_TTL_SEC`).
-- **Observação importante**: o CRUD de `config_pairs` está disponível por API (`/api/bot-config`). O dashboard web atual não possui tela dedicada para editar `config_pairs`.
+- **Config operacional 100% via DB**: suportado via Dashboard e endpoints `/api/bot-config` + `/api/bot-global-config`.
+- **Alteração sem restart**: `risk_percentage`, `mode`, `loop_interval_ms` e `kill_switch_enabled` são recarregados no worker em tempo de execução.
+- **`/api/config` e `config.txt`**: fluxo legado/dev (não recomendado para operação).
 
 ---
 
@@ -49,7 +50,7 @@ ExchangeHub -> Exchanges (Paper/Live)
 ```
 
 ### Fluxo principal do ciclo
-1. `MainMonitor` atualiza lista de pares (INI + `config_pairs`).
+1. `MainMonitor` atualiza lista de pares a partir de `config_pairs` (DB).
 2. Para cada par:
    - recarrega `bot_config` (enabled, strategy, risk_percentage, max_daily_loss),
    - coleta mids por exchange,
@@ -61,6 +62,33 @@ ExchangeHub -> Exchanges (Paper/Live)
 ---
 
 ## 3) Configuração
+
+## 3) Configuração operacional (fonte única: SQLite)
+
+### 3.1 Config por par (`config_pairs`)
+
+Use o Dashboard (aba **Config do Bot (DB)**) ou a API `/api/bot-config`.
+
+### 3.2 Config global (`bot_global_config`)
+
+Use o Dashboard (aba **Config do Bot (DB)**) ou a API `/api/bot-global-config`.
+
+Campos globais:
+- `mode` (`PAPER` ou `LIVE`)
+- `loop_interval_ms`
+- `kill_switch_enabled`
+- `max_positions`
+- `max_daily_loss`
+
+### 3.3 Endpoints operacionais
+
+- `GET/POST /api/bot-config`
+- `GET/POST /api/bot-global-config`
+
+### 3.4 Legacy
+
+- `GET/POST /api/config` permanece para debug/compatibilidade.
+- `config.txt` deve ser tratado como legado/dev e não como fonte operacional principal.
 
 ## 3.1 `bot_config` por par (tabela `config_pairs`)
 

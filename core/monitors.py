@@ -160,10 +160,13 @@ class MainMonitor:
 
         self.loop_interval_ms = int(self.cfg.get("GLOBAL", "LOOP_INTERVAL_MS", fallback="1200"))
         self.print_every_sec = int(self.cfg.get("GLOBAL", "PRINT_EVERY_SEC", fallback="5"))
+        self.use_config_file_pairs = self.cfg.getboolean("GLOBAL", "USE_CONFIG_FILE_PAIRS", fallback=False)
 
         raw_pairs = self.cfg.get("PAIRS", "LIST", fallback="")
         self.cfg_pairs: List[str] = [p.strip().upper() for p in raw_pairs.split(",") if p.strip()]
-        self.pairs: List[str] = list(dict.fromkeys(self.cfg_pairs))
+        self.pairs: List[str] = list(dict.fromkeys(self.cfg_pairs if self.use_config_file_pairs else []))
+        self.global_config: Dict[str, Any] = {}
+        self._last_global_updated_at: str = ""
 
         # Cache curto para reload dinâmico de bot_config durante o loop.
         self.bot_config_cache_ttl_sec = float(
@@ -381,11 +384,65 @@ class MainMonitor:
             return
 
         try:
-            configs = self.state.get_bot_configs(enabled_only=None) or []
+            configs = self.state.get_bot_configs(enabled_only=True) or []
             db_pairs = [str(item.get("pair") or "").strip().upper() for item in configs if item.get("pair")]
-            self.pairs = list(dict.fromkeys(self.cfg_pairs + db_pairs))
+            seed_pairs = self.cfg_pairs if self.use_config_file_pairs else []
+            self.pairs = list(dict.fromkeys(seed_pairs + db_pairs))
         except Exception as e:
             log.warning(f"[config_reload] falha ao atualizar pares do banco: {e}")
+
+    def _load_global_config(self) -> Dict[str, Any]:
+        defaults = {
+            "mode": "PAPER",
+            "loop_interval_ms": self.loop_interval_ms,
+            "kill_switch_enabled": False,
+            "max_positions": 1,
+            "max_daily_loss": 0.0,
+            "updated_at": "",
+        }
+        if not hasattr(self.state, "get_bot_global_config"):
+            return defaults
+        try:
+            data = self.state.get_bot_global_config() or {}
+            cfg = {
+                "mode": str(data.get("mode") or defaults["mode"]).upper(),
+                "loop_interval_ms": int(data.get("loop_interval_ms") or defaults["loop_interval_ms"]),
+                "kill_switch_enabled": bool(data.get("kill_switch_enabled", defaults["kill_switch_enabled"])),
+                "max_positions": int(data.get("max_positions") or defaults["max_positions"]),
+                "max_daily_loss": float(data.get("max_daily_loss") or defaults["max_daily_loss"]),
+                "updated_at": str(data.get("updated_at") or ""),
+            }
+            return cfg
+        except Exception as e:
+            log.warning(f"[global_config] falha ao ler config global: {e}")
+            return defaults
+
+    def _apply_global_config(self) -> Dict[str, Any]:
+        cfg = self._load_global_config()
+        self.global_config = cfg
+
+        self.loop_interval_ms = max(100, int(cfg.get("loop_interval_ms") or self.loop_interval_ms))
+        if hasattr(self.ex_hub, "mode"):
+            self.ex_hub.mode = "PAPER" if str(cfg.get("mode") or "PAPER").upper() == "PAPER" else "LIVE"
+        if hasattr(self.risk, "max_open_per_pair_ex"):
+            self.risk.max_open_per_pair_ex = max(1, int(cfg.get("max_positions") or 1))
+        if hasattr(self.risk, "kill_dd_pct"):
+            self.risk.kill_dd_pct = max(0.0, float(cfg.get("max_daily_loss") or 0.0))
+
+        updated_at = str(cfg.get("updated_at") or "")
+        if updated_at and updated_at != self._last_global_updated_at:
+            log.info(
+                "[global_config] updated_at=%s mode=%s loop_interval_ms=%s kill_switch_enabled=%s max_positions=%s max_daily_loss=%.4f",
+                updated_at,
+                cfg.get("mode"),
+                self.loop_interval_ms,
+                cfg.get("kill_switch_enabled"),
+                cfg.get("max_positions"),
+                float(cfg.get("max_daily_loss") or 0.0),
+            )
+            self._last_global_updated_at = updated_at
+
+        return cfg
 
     def _load_pair_config(self, pair: str, now: float) -> Dict[str, Any]:
         pair_norm = str(pair or "").strip().upper()
@@ -1140,7 +1197,11 @@ class MainMonitor:
                 mids_map: Dict[str, Dict[str, Optional[float]]] = {}
 
                 try:
+                    global_cfg = self._apply_global_config()
                     self._refresh_pairs_from_db()
+                    if bool(global_cfg.get("kill_switch_enabled")):
+                        log.warning("[global_config] kill_switch_enabled=true: ciclo sem envio de ordens.")
+                        self._render_panel(ref_map, mids_map)
                     for pair in self.pairs:
                         try:
                             cycle_now = time.time()
@@ -1172,6 +1233,9 @@ class MainMonitor:
                                     f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, "
                                     f"mas runtime atual={strategy_name}. Ignorando par."
                                 )
+                                continue
+
+                            if bool(global_cfg.get("kill_switch_enabled")):
                                 continue
 
                             log.info(
