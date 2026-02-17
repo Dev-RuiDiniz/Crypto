@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from utils.logger import configure_logging, get_logger, get_user_logger
+from app.pathing import ConfigResolutionError, get_work_dir, resolve_config_path
 from app.version import APP_VERSION
 
 APP_NAME = "ARBIT"
@@ -478,14 +479,17 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
 def main():
     """Ponto de entrada principal."""
     args = parse_args()
-    
-    # Ajusta diretório base para facilitar execução de qualquer lugar
-    config_path = Path(args.config).resolve()
-    if not config_path.exists():
-        print(f"[ERRO] ❌ Arquivo de configuração não encontrado: {config_path}")
+
+    try:
+        resolution = resolve_config_path(args.config, must_exist=True)
+    except ConfigResolutionError as exc:
+        print(f"[ERRO] ❌ {exc}")
         sys.exit(1)
-    
-    base_dir = config_path.parent
+
+    # Ajusta diretório base para facilitar execução de qualquer lugar
+    config_path = resolution.path
+
+    base_dir = get_work_dir()
     os.chdir(base_dir)
     
     # Verifica se estamos no diretório correto (somente modo source)

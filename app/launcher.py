@@ -13,6 +13,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from app.pathing import ConfigResolutionError, ensure_default_config_in_data_dir, resolve_config_path
 from app.paths import ensure_runtime_dirs, resolve_app_paths
 from app.processes import current_python, spawn_process, terminate_process
 from app.version import APP_VERSION
@@ -85,6 +86,25 @@ def _open_logs_folder(log_dir: Path, logger: logging.Logger) -> None:
         logger.warning("Ação 'Abrir pasta de logs' é suportada apenas no Windows.")
 
 
+def _log_worker_config_failure(
+    logger: logging.Logger,
+    worker_cmd: list[str],
+    cwd: Path,
+    tried_paths: list[Path],
+) -> None:
+    logger.error("[BOOT] Worker failed to start: config file not found")
+    logger.error("[BOOT] ----- WORKER CONFIG ERROR -----")
+    logger.error("[BOOT] cmd: %s", " ".join(worker_cmd))
+    logger.error("[BOOT] cwd: %s", cwd)
+    logger.error("[BOOT] caminhos tentados:")
+    for path in tried_paths:
+        logger.error("[BOOT]   - %s", path)
+    logger.error(
+        "[BOOT] sugestão: coloque config em DATA_DIR ou passe --config absoluto"
+    )
+    logger.error("[BOOT] -------------------------------")
+
+
 def main() -> int:
     args = parse_args()
 
@@ -95,7 +115,14 @@ def main() -> int:
         return 0
     if args.run_worker:
         from bot import main as worker_main
-        worker_argv = [sys.argv[0], "--config", args.config]
+
+        try:
+            resolved_config = str(resolve_config_path(args.config, must_exist=True).path)
+        except ConfigResolutionError as exc:
+            print(f"[ERRO] ❌ {exc}")
+            return 1
+
+        worker_argv = [sys.argv[0], "--config", resolved_config]
         if args.db_path:
             worker_argv.extend(["--db-path", str(args.db_path)])
         original_argv = sys.argv
@@ -117,6 +144,10 @@ def main() -> int:
     logger.info("[BOOT] LOG_DIR=%s", paths.log_dir)
     logger.info("[BOOT] DB_PATH=%s", paths.db_path.resolve())
 
+    copied_config = ensure_default_config_in_data_dir()
+    if copied_config:
+        logger.info("[BOOT] Copied default config to DATA_DIR: %s", copied_config)
+
     if args.open_logs:
         _open_logs_folder(paths.log_dir, logger)
         return 0
@@ -129,9 +160,22 @@ def main() -> int:
     env["TRADINGBOT_WORKER_LOG_FILE"] = str(paths.log_dir / "worker.log")
 
     py_bin = current_python()
+    try:
+        config_resolution = resolve_config_path(args.config, must_exist=True)
+    except ConfigResolutionError as exc:
+        worker_cmd_preview = [py_bin, "--run-worker", "--config", args.config, "--db-path", str(paths.db_path)]
+        _log_worker_config_failure(
+            logger=logger,
+            worker_cmd=worker_cmd_preview,
+            cwd=repo_root,
+            tried_paths=exc.tried_paths,
+        )
+        return 1
+    resolved_config = str(config_resolution.path)
+
     if getattr(sys, "frozen", False):
         api_cmd = [py_bin, "--run-api", "--host", args.host, "--port", str(selected_port), "--db-path", str(paths.db_path)]
-        worker_cmd = [py_bin, "--run-worker", "--config", args.config, "--db-path", str(paths.db_path)]
+        worker_cmd = [py_bin, "--run-worker", "--config", resolved_config, "--db-path", str(paths.db_path)]
     else:
         api_cmd = [
             py_bin,
@@ -149,7 +193,7 @@ def main() -> int:
             "-m",
             "bot",
             "--config",
-            args.config,
+            resolved_config,
             "--db-path",
             str(paths.db_path),
         ]
