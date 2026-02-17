@@ -14,6 +14,9 @@ export function BotConfigPanel() {
   const [loading, setLoading] = useState(true);
   const [configStatus, setConfigStatus] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [arbPair, setArbPair] = useState("");
+  const [arbCfg, setArbCfg] = useState(null);
+  const [arbStatus, setArbStatus] = useState(null);
 
   const fmtTime = (isoValue) => {
     if (!isoValue) return "—";
@@ -25,11 +28,10 @@ export function BotConfigPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const [pairsData, globalData] = await Promise.all([
-        api.getBotConfig(),
-        api.getBotGlobalConfig()
-      ]);
-      setRows((pairsData.items || []).map((item) => ({ ...item })));
+      const [pairsData, globalData] = await Promise.all([api.getBotConfig(), api.getBotGlobalConfig()]);
+      const nextRows = (pairsData.items || []).map((item) => ({ ...item }));
+      setRows(nextRows);
+      if (!arbPair && nextRows.length > 0) setArbPair(nextRows[0].pair || "");
       setGlobalCfg({
         mode: globalData.mode || "PAPER",
         loop_interval_ms: globalData.loop_interval_ms || 2000,
@@ -46,9 +48,7 @@ export function BotConfigPanel() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -60,9 +60,21 @@ export function BotConfigPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const updateRow = (idx, key, value) => {
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
-  };
+  useEffect(() => {
+    const loadArb = async () => {
+      if (!arbPair) return;
+      try {
+        const [cfgRes, statusRes] = await Promise.all([api.getArbitrageConfig(arbPair), api.getArbitrageStatus(arbPair)]);
+        setArbCfg(cfgRes.item || { symbol: arbPair, enabled: false, mode: "TWO_LEG" });
+        setArbStatus(statusRes.item || null);
+      } catch (_e) {
+        setArbCfg({ symbol: arbPair, enabled: false, mode: "TWO_LEG" });
+      }
+    };
+    loadArb();
+  }, [arbPair, rows.length]);
+
+  const updateRow = (idx, key, value) => setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
 
   const saveRow = async (row) => {
     try {
@@ -72,9 +84,7 @@ export function BotConfigPanel() {
       await load();
     } catch (err) {
       toast(err.message || "Falha ao salvar par", true);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const saveGlobal = async () => {
@@ -85,111 +95,91 @@ export function BotConfigPanel() {
       await load();
     } catch (err) {
       toast(err.message || "Falha ao salvar config global", true);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
+  };
+
+  const saveArbitrage = async () => {
+    try {
+      setSaving(true);
+      await api.upsertArbitrageConfig({ ...arbCfg, pair: arbPair });
+      toast("Arbitragem salva com sucesso");
+      const statusRes = await api.getArbitrageStatus(arbPair);
+      setArbStatus(statusRes.item || null);
+    } catch (err) {
+      toast(err.message || "Falha ao salvar arbitragem", true);
+    } finally { setSaving(false); }
   };
 
   const inSync = !!(configStatus && configStatus.in_sync);
 
   if (loading) return e("div", { className: "panel" }, "Carregando configurações do bot...");
 
-  return e(
-    "div",
-    null,
-    configStatus && e(
-      "div",
-      { className: "panel" },
+  return e("div", null,
+    configStatus && e("div", { className: "panel" },
       e("h2", null, "Status de Aplicação"),
       e("p", null, `Config do banco: v${configStatus.db_config_version || "-"} (atualizado às ${fmtTime(configStatus.db_config_updated_at)})`),
       e("p", null, `Worker aplicou: v${configStatus.worker_last_applied_config_version || "-"} (aplicado às ${fmtTime(configStatus.worker_last_applied_config_at)})`),
       e("strong", { className: inSync && !saving ? "text-success" : "text-warning" }, (!inSync || saving) ? "Aplicando..." : `Aplicado às ${fmtTime(configStatus.worker_last_applied_config_at)}`)
     ),
-    e(
-      "div",
-      { className: "panel" },
+
+    e("div", { className: "panel" },
       e("h2", null, "Config Global (DB)"),
-      globalCfg &&
-        e(
-          React.Fragment,
-          null,
-          e("div", { className: "form-row" },
-            e("label", null, "Mode"),
-            e("select", {
-              value: globalCfg.mode,
-              onChange: (ev) => setGlobalCfg({ ...globalCfg, mode: ev.target.value })
-            }, e("option", { value: "PAPER" }, "PAPER"), e("option", { value: "LIVE" }, "LIVE"))
-          ),
-          e("div", { className: "form-row" },
-            e("label", null, "Loop interval (ms)"),
-            e("input", {
-              type: "number",
-              value: globalCfg.loop_interval_ms,
-              onChange: (ev) => setGlobalCfg({ ...globalCfg, loop_interval_ms: parseInt(ev.target.value || "0", 10) || 0 })
-            })
-          ),
-          e("div", { className: "form-row" },
-            e("label", null, "Kill switch"),
-            e("input", {
-              type: "checkbox",
-              checked: globalCfg.kill_switch_enabled,
-              onChange: (ev) => setGlobalCfg({ ...globalCfg, kill_switch_enabled: ev.target.checked })
-            })
-          ),
-          e("div", { className: "form-row" },
-            e("label", null, "Max positions"),
-            e("input", {
-              type: "number",
-              value: globalCfg.max_positions,
-              onChange: (ev) => setGlobalCfg({ ...globalCfg, max_positions: parseInt(ev.target.value || "1", 10) || 1 })
-            })
-          ),
-          e("div", { className: "form-row" },
-            e("label", null, "Max daily loss"),
-            e("input", {
-              type: "number",
-              step: "0.01",
-              value: globalCfg.max_daily_loss,
-              onChange: (ev) => setGlobalCfg({ ...globalCfg, max_daily_loss: parseFloat(ev.target.value || "0") || 0 })
-            })
-          ),
-          e("button", { className: "btn", onClick: saveGlobal }, "Salvar")
-        )
+      globalCfg && e(React.Fragment, null,
+        e("div", { className: "form-row" }, e("label", null, "Mode"), e("select", { value: globalCfg.mode, onChange: (ev) => setGlobalCfg({ ...globalCfg, mode: ev.target.value }) }, e("option", { value: "PAPER" }, "PAPER"), e("option", { value: "LIVE" }, "LIVE"))),
+        e("div", { className: "form-row" }, e("label", null, "Loop interval (ms)"), e("input", { type: "number", value: globalCfg.loop_interval_ms, onChange: (ev) => setGlobalCfg({ ...globalCfg, loop_interval_ms: parseInt(ev.target.value || "0", 10) || 0 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Kill switch"), e("input", { type: "checkbox", checked: globalCfg.kill_switch_enabled, onChange: (ev) => setGlobalCfg({ ...globalCfg, kill_switch_enabled: ev.target.checked }) })),
+        e("div", { className: "form-row" }, e("label", null, "Max positions"), e("input", { type: "number", value: globalCfg.max_positions, onChange: (ev) => setGlobalCfg({ ...globalCfg, max_positions: parseInt(ev.target.value || "1", 10) || 1 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Max daily loss"), e("input", { type: "number", step: "0.01", value: globalCfg.max_daily_loss, onChange: (ev) => setGlobalCfg({ ...globalCfg, max_daily_loss: parseFloat(ev.target.value || "0") || 0 }) })),
+        e("button", { className: "btn", onClick: saveGlobal }, "Salvar")
+      )
     ),
-    e(
-      "div",
-      { className: "panel" },
+
+    e("div", { className: "panel" },
       e("h2", null, "Config por Par (DB)"),
-      e(
-        "div",
-        { className: "table-wrapper" },
-        e(
-          "table",
-          { className: "table" },
-          e("thead", null, e("tr", null,
-            e("th", null, "Pair"),
-            e("th", null, "Enabled"),
-            e("th", null, "Strategy"),
-            e("th", null, "Risk %"),
-            e("th", null, "Max daily loss"),
-            e("th", null, "Ações")
-          )),
+      e("div", { className: "table-wrapper" },
+        e("table", { className: "table" },
+          e("thead", null, e("tr", null, e("th", null, "Pair"), e("th", null, "Enabled"), e("th", null, "Strategy"), e("th", null, "Risk %"), e("th", null, "Max daily loss"), e("th", null, "Ações"))),
           e("tbody", null,
             rows.map((row, idx) => e("tr", { key: row.pair || idx },
               e("td", null, e("input", { value: row.pair || "", onChange: (ev) => updateRow(idx, "pair", ev.target.value) })),
               e("td", null, e("input", { type: "checkbox", checked: !!row.enabled, onChange: (ev) => updateRow(idx, "enabled", ev.target.checked) })),
               e("td", null, e("select", { value: row.strategy || "StrategySpread", onChange: (ev) => updateRow(idx, "strategy", ev.target.value) },
-                e("option", { value: "StrategySpread" }, "StrategySpread")
+                e("option", { value: "StrategySpread" }, "StrategySpread"),
+                e("option", { value: "StrategyArbitrageSimple" }, "StrategyArbitrageSimple")
               )),
               e("td", null, e("input", { type: "number", step: "0.01", value: row.risk_percentage || 0, onChange: (ev) => updateRow(idx, "risk_percentage", parseFloat(ev.target.value || "0") || 0) })),
               e("td", null, e("input", { type: "number", step: "0.01", value: row.max_daily_loss || 0, onChange: (ev) => updateRow(idx, "max_daily_loss", parseFloat(ev.target.value || "0") || 0) })),
               e("td", null, e("button", { className: "btn", onClick: () => saveRow(row) }, "Salvar"))
             )),
-            e("tr", { key: "new" },
-              e("td", { colSpan: 6 }, e("button", { className: "btn", onClick: () => setRows([...rows, { pair: "", enabled: true, strategy: "StrategySpread", risk_percentage: 0, max_daily_loss: 0 }]) }, "+ Adicionar par"))
-            )
+            e("tr", { key: "new" }, e("td", { colSpan: 6 }, e("button", { className: "btn", onClick: () => setRows([...rows, { pair: "", enabled: true, strategy: "StrategySpread", risk_percentage: 0, max_daily_loss: 0 }]) }, "+ Adicionar par")))
           )
         )
+      )
+    ),
+
+    e("div", { className: "panel" },
+      e("h2", null, "Arbitragem (MVP)"),
+      e("div", { className: "form-row" },
+        e("label", null, "Par"),
+        e("select", { value: arbPair, onChange: (ev) => setArbPair(ev.target.value) },
+          rows.map((r) => e("option", { key: r.pair, value: r.pair }, r.pair || "—"))
+        )
+      ),
+      arbCfg && e(React.Fragment, null,
+        e("div", { className: "form-row" }, e("label", null, "Habilitar"), e("input", { type: "checkbox", checked: !!arbCfg.enabled, onChange: (ev) => setArbCfg({ ...arbCfg, enabled: ev.target.checked }) })),
+        e("div", { className: "form-row" }, e("label", null, "Exchange A"), e("input", { value: arbCfg.exchange_a || "", onChange: (ev) => setArbCfg({ ...arbCfg, exchange_a: ev.target.value }) })),
+        e("div", { className: "form-row" }, e("label", null, "Exchange B"), e("input", { value: arbCfg.exchange_b || "", onChange: (ev) => setArbCfg({ ...arbCfg, exchange_b: ev.target.value }) })),
+        e("div", { className: "form-row" }, e("label", null, "Threshold (%)"), e("input", { type: "number", step: "0.01", value: arbCfg.threshold_percent || 0.15, onChange: (ev) => setArbCfg({ ...arbCfg, threshold_percent: parseFloat(ev.target.value || "0") || 0 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Threshold absoluto"), e("input", { type: "number", step: "0.01", value: arbCfg.threshold_absolute || 0.2, onChange: (ev) => setArbCfg({ ...arbCfg, threshold_absolute: parseFloat(ev.target.value || "0") || 0 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Tamanho máximo"), e("input", { type: "number", step: "0.0001", value: arbCfg.max_trade_size || 0, onChange: (ev) => setArbCfg({ ...arbCfg, max_trade_size: parseFloat(ev.target.value || "0") || 0 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Cooldown (ms)"), e("input", { type: "number", value: arbCfg.cooldown_ms || 0, onChange: (ev) => setArbCfg({ ...arbCfg, cooldown_ms: parseInt(ev.target.value || "0", 10) || 0 }) })),
+        e("div", { className: "form-row" }, e("label", null, "Modo"), e("select", { value: arbCfg.mode || "TWO_LEG", onChange: (ev) => setArbCfg({ ...arbCfg, mode: ev.target.value }) }, e("option", { value: "TWO_LEG" }, "TWO_LEG"), e("option", { value: "ONE_LEG" }, "ONE_LEG"))),
+        e("button", { className: "btn", onClick: saveArbitrage }, "Salvar arbitragem")
+      ),
+      arbStatus && e("div", { className: "mt-2" },
+        e("p", null, `Estado: ${arbStatus.runtime_state || "IDLE"}`),
+        e("p", null, `Última oportunidade: ${JSON.stringify(arbStatus.last_opportunity || {})}`),
+        e("p", null, `Última execução: ${JSON.stringify(arbStatus.last_execution || {})}`)
       )
     )
   );

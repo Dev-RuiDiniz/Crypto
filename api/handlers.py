@@ -972,6 +972,171 @@ def upsert_bot_config(payload: Dict[str, Any]):
     return True, f"bot_config salvo para {pair}. config_version={new_version}"
 
 
+def get_arbitrage_config(pair: str, tenant_id: str = "default") -> Dict[str, Any]:
+    pair_norm = str(pair or "").strip().upper().replace("-", "/")
+    if not pair_norm:
+        return {"item": {}}
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return {"item": {}}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT tenant_id, symbol, enabled, exchange_a, exchange_b,
+                   threshold_percent, threshold_absolute, max_trade_size,
+                   cooldown_ms, mode, fee_percent, slippage_percent, updated_at
+            FROM arbitrage_config
+            WHERE tenant_id=? AND symbol=?
+            """,
+            (str(tenant_id or "default"), pair_norm),
+        ).fetchone()
+        if not row:
+            return {"item": {"tenant_id": tenant_id, "symbol": pair_norm, "enabled": False, "mode": "TWO_LEG"}}
+        return {
+            "item": {
+                "tenant_id": str(row["tenant_id"]),
+                "symbol": str(row["symbol"]),
+                "enabled": bool(row["enabled"]),
+                "exchange_a": str(row["exchange_a"] or ""),
+                "exchange_b": str(row["exchange_b"] or ""),
+                "threshold_percent": float(row["threshold_percent"] or 0.15),
+                "threshold_absolute": float(row["threshold_absolute"] or 0.2),
+                "max_trade_size": float(row["max_trade_size"] or 0.0),
+                "cooldown_ms": int(row["cooldown_ms"] or 0),
+                "mode": str(row["mode"] or "TWO_LEG"),
+                "fee_percent": float(row["fee_percent"] or 0.1),
+                "slippage_percent": float(row["slippage_percent"] or 0.05),
+                "updated_at": float(row["updated_at"] or 0.0),
+            }
+        }
+    finally:
+        conn.close()
+
+
+def upsert_arbitrage_config(payload: Dict[str, Any], tenant_id: str = "default"):
+    pair = str(payload.get("pair") or payload.get("symbol") or "").strip().upper().replace("-", "/")
+    if not pair:
+        return False, "Campo 'pair' é obrigatório."
+
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS arbitrage_config (
+                tenant_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                exchange_a TEXT,
+                exchange_b TEXT,
+                threshold_percent REAL NOT NULL DEFAULT 0.15,
+                threshold_absolute REAL NOT NULL DEFAULT 0.2,
+                max_trade_size REAL NOT NULL DEFAULT 0,
+                cooldown_ms INTEGER NOT NULL DEFAULT 0,
+                mode TEXT NOT NULL DEFAULT 'TWO_LEG',
+                fee_percent REAL NOT NULL DEFAULT 0.1,
+                slippage_percent REAL NOT NULL DEFAULT 0.05,
+                updated_at REAL,
+                PRIMARY KEY (tenant_id, symbol)
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO arbitrage_config(
+                tenant_id, symbol, enabled, exchange_a, exchange_b,
+                threshold_percent, threshold_absolute, max_trade_size,
+                cooldown_ms, mode, fee_percent, slippage_percent, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, symbol) DO UPDATE SET
+                enabled=excluded.enabled,
+                exchange_a=excluded.exchange_a,
+                exchange_b=excluded.exchange_b,
+                threshold_percent=excluded.threshold_percent,
+                threshold_absolute=excluded.threshold_absolute,
+                max_trade_size=excluded.max_trade_size,
+                cooldown_ms=excluded.cooldown_ms,
+                mode=excluded.mode,
+                fee_percent=excluded.fee_percent,
+                slippage_percent=excluded.slippage_percent,
+                updated_at=excluded.updated_at
+            """,
+            (
+                str(tenant_id or "default"),
+                pair,
+                1 if _safe_bool(payload.get("enabled"), False) else 0,
+                str(payload.get("exchange_a") or "").lower(),
+                str(payload.get("exchange_b") or "").lower(),
+                float(_safe_float(payload.get("threshold_percent"), 0.15)),
+                float(_safe_float(payload.get("threshold_absolute"), 0.2)),
+                float(_safe_float(payload.get("max_trade_size"), 0.0)),
+                int(_safe_float(payload.get("cooldown_ms"), 0)),
+                str(payload.get("mode") or "TWO_LEG").upper(),
+                float(_safe_float(payload.get("fee_percent"), 0.1)),
+                float(_safe_float(payload.get("slippage_percent"), 0.05)),
+                float(time.time()),
+            ),
+        )
+        new_version = _bump_config_version(conn, reason=f"arbitrage_config updated: {pair}", updated_by="dashboard")
+        conn.commit()
+    except Exception as e:
+        return False, f"Falha ao salvar arbitrage_config: {e}"
+    finally:
+        conn.close()
+
+    return True, f"arbitrage_config salvo para {pair}. config_version={new_version}"
+
+
+def get_arbitrage_status(pair: str, tenant_id: str = "default") -> Dict[str, Any]:
+    pair_norm = str(pair or "").strip().upper().replace("-", "/")
+    if not pair_norm:
+        return {"item": {}}
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return {"item": {}}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT tenant_id, symbol, runtime_state, strategy_lock,
+                   last_opportunity, last_execution, last_success_ts, updated_at
+            FROM arbitrage_state
+            WHERE tenant_id=? AND symbol=?
+            """,
+            (str(tenant_id or "default"), pair_norm),
+        ).fetchone()
+        if not row:
+            return {"item": {"tenant_id": tenant_id, "symbol": pair_norm, "runtime_state": "IDLE"}}
+        try:
+            last_opportunity = json.loads(str(row["last_opportunity"] or "{}"))
+        except Exception:
+            last_opportunity = {}
+        try:
+            last_execution = json.loads(str(row["last_execution"] or "{}"))
+        except Exception:
+            last_execution = {}
+        return {
+            "item": {
+                "tenant_id": str(row["tenant_id"]),
+                "symbol": str(row["symbol"]),
+                "runtime_state": str(row["runtime_state"] or "IDLE"),
+                "strategy_lock": bool(row["strategy_lock"]),
+                "last_opportunity": last_opportunity,
+                "last_execution": last_execution,
+                "last_success_ts": int(row["last_success_ts"] or 0),
+                "updated_at": float(row["updated_at"] or 0.0),
+            }
+        }
+    finally:
+        conn.close()
+
 def get_bot_global_config() -> Dict[str, Any]:
     cfg = _load_config()
     db_path = _resolve_sqlite_path(cfg)

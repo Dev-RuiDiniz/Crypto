@@ -164,6 +164,7 @@ def import_or_die():
     required_modules = [
         ("exchanges.exchanges_client", "ExchangeHub"),
         ("core.strategy_spread", "StrategySpread"),
+        ("core.strategy_arbitrage_simple", "StrategyArbitrageSimple"),
         ("core.order_router", "OrderRouter"),
         ("core.order_manager", "OrderManager"),
         ("core.portfolio", "Portfolio"),
@@ -211,13 +212,14 @@ def get_components(cfg):
     """Importa e retorna todos os componentes necessários."""
     from exchanges.exchanges_client import ExchangeHub
     from core.strategy_spread import StrategySpread
+    from core.strategy_arbitrage_simple import StrategyArbitrageSimple
     from core.order_router import OrderRouter
     from core.order_manager import OrderManager
     from core.portfolio import Portfolio
     from core.state_store import StateStore
     from core.risk_manager import RiskManager
     from core.monitors import MainMonitor
-    return ExchangeHub, StrategySpread, OrderRouter, OrderManager, Portfolio, StateStore, RiskManager, MainMonitor
+    return ExchangeHub, StrategySpread, StrategyArbitrageSimple, OrderRouter, OrderManager, Portfolio, StateStore, RiskManager, MainMonitor
 
 # ---------------- Helpers de BOOT ----------------
 
@@ -320,7 +322,7 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
     import_or_die()
     
     try:
-        ExchangeHub, StrategySpread, OrderRouter, OrderManager, Portfolio, StateStore, RiskManager, MainMonitor = get_components(cfg)
+        ExchangeHub, StrategySpread, StrategyArbitrageSimple, OrderRouter, OrderManager, Portfolio, StateStore, RiskManager, MainMonitor = get_components(cfg)
     except Exception as e:
         log.error(f"Falha ao importar componentes: {e}")
         ulog.error("❌ Falha ao carregar componentes do bot. Verifique logs detalhados.")
@@ -464,9 +466,10 @@ async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
         strategy = StrategySpread(cfg)
         portfolio = Portfolio(cfg, ex_hub)
         risk = RiskManager(cfg)
+        strategy_arbitrage = StrategyArbitrageSimple(cfg, ex_hub, state, risk, tenant_id=tenant_id)
         router = OrderRouter(cfg, ex_hub, portfolio, risk, state)
         order_manager = OrderManager(cfg, ex_hub, state, risk)
-        monitor = MainMonitor(cfg, ex_hub, strategy, router, order_manager, portfolio, state, risk)
+        monitor = MainMonitor(cfg, ex_hub, strategy, router, order_manager, portfolio, state, risk, strategy_arbitrage=strategy_arbitrage)
     except Exception as e:
         log.error(f"Falha ao criar componentes: {e}", exc_info=True)
         ulog.error("❌ Falha ao inicializar componentes do bot.")

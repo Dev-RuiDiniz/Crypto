@@ -246,6 +246,24 @@ def api_bot_global_config():
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 
 
+
+@app.route("/api/arbitrage-config", methods=["GET", "POST"])
+def api_arbitrage_config():
+    tenant_id = request.headers.get("X-Tenant-Id", "default")
+    if request.method == "GET":
+        pair = request.args.get("pair", "")
+        return jsonify(handlers.get_arbitrage_config(pair, tenant_id=tenant_id))
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    ok, msg = handlers.upsert_arbitrage_config(payload, tenant_id=tenant_id)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/arbitrage-status")
+def api_arbitrage_status():
+    tenant_id = request.headers.get("X-Tenant-Id", "default")
+    pair = request.args.get("pair", "")
+    return jsonify(handlers.get_arbitrage_status(pair, tenant_id=tenant_id))
+
 @app.route("/api/debug")
 def api_debug():
     return jsonify(handlers.debug_snapshot())

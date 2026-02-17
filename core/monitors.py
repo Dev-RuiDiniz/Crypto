@@ -148,6 +148,7 @@ class MainMonitor:
         portfolio,
         state,
         risk,
+        strategy_arbitrage=None,
     ):
         self.cfg = cfg
         self.ex_hub = ex_hub
@@ -157,6 +158,7 @@ class MainMonitor:
         self.portfolio = portfolio
         self.state = state
         self.risk = risk
+        self.strategy_arbitrage = strategy_arbitrage
 
         self.loop_interval_ms = int(self.cfg.get("GLOBAL", "LOOP_INTERVAL_MS", fallback="1200"))
         self.print_every_sec = int(self.cfg.get("GLOBAL", "PRINT_EVERY_SEC", fallback="5"))
@@ -1271,10 +1273,12 @@ class MainMonitor:
                                 continue
 
                             strategy_name = self.strategy.__class__.__name__
-                            if cfg_strategy.lower() not in (strategy_name.lower(), self.strategy.__class__.__name__.lower()):
+                            strategy_lower = cfg_strategy.lower()
+                            is_spread = strategy_lower == strategy_name.lower()
+                            is_arb = strategy_lower == "strategyarbitragesimple"
+                            if not is_spread and not is_arb:
                                 log.info(
-                                    f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, "
-                                    f"mas runtime atual={strategy_name}. Ignorando par."
+                                    f"[ExecutionEngine] {pair} configurado para strategy={cfg_strategy}, sem executor registrado. Ignorando par."
                                 )
                                 continue
 
@@ -1285,6 +1289,18 @@ class MainMonitor:
                                 f"[ExecutionEngine] {datetime.utcnow().isoformat()}Z - "
                                 f"Symbol: {pair} - Strategy: {cfg_strategy}"
                             )
+
+                            if is_arb:
+                                if self.strategy_arbitrage is None:
+                                    log.warning(f"[ExecutionEngine] {pair} StrategyArbitrageSimple não inicializada.")
+                                    continue
+                                arb_cfg = self.state.get_arbitrage_config(getattr(self.ex_hub, "tenant_id", "default"), pair)
+                                if not arb_cfg:
+                                    log.info(f"[ExecutionEngine] {pair} sem arbitrage_config. Ignorando.")
+                                    continue
+                                await self.strategy_arbitrage.run_cycle(pair, arb_cfg, global_cfg=global_cfg)
+                                continue
+
                             mids = await self._mid_per_exchange(pair)
                             mids_map[pair] = mids
                             ref = self._reference_price(pair, mids)
