@@ -123,6 +123,24 @@ Pontos principais:
 
 ## 4) Como rodar local
 
+### Executável Local (Sprint 0)
+
+Novo bootstrap unificado:
+
+```bash
+python -m app.launcher --port 8000 --config config.txt
+```
+
+Esse comando inicia API + worker com o mesmo `--db-path` absoluto em `%LOCALAPPDATA%/TradingBot/data/state.db` (ou fallback `~/.local/share/TradingBot/data/state.db` em dev não-Windows), aguarda `/api/health` e abre o dashboard automaticamente.
+
+Health endpoints:
+- `GET /api/health`
+- `GET /api/health/db`
+- `GET /api/health/worker`
+
+Veja o guia completo em `docs/local-executable-dev.md`.
+
+### Modo legado (manual)
 ### Pré-requisitos
 - Python 3.11+
 - Dependências de `requirements.txt`

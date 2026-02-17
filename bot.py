@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from utils.logger import configure_logging, get_logger, get_user_logger
+from app.version import APP_VERSION
 
 APP_NAME = "ARBIT"
 log = get_logger(APP_NAME)         # técnico -> arquivo detalhado
@@ -29,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="ARBIT - Bot de arbitragem multi-exchanges")
     p.add_argument("config", nargs="?", default="config.txt",
                    help="Caminho do arquivo INI (padrão: ./config.txt)")
+    p.add_argument("--db-path", default=None, help="Sobrescreve SQLITE_PATH")
     return p.parse_args()
 
 
@@ -72,7 +74,7 @@ def setup_logging_from_config(cfg: configparser.ConfigParser):
     base_level     = cfg.get("LOG", "LEVEL", fallback="INFO")
     console_level  = cfg.get("LOG", "CONSOLE_LEVEL", fallback=base_level)
     file_level     = cfg.get("LOG", "FILE_LEVEL", fallback="DEBUG")
-    filename       = cfg.get("LOG", "FILE", fallback="./logs/arbit.log")
+    filename       = os.getenv("TRADINGBOT_WORKER_LOG_FILE", "").strip() or cfg.get("LOG", "FILE", fallback="./logs/arbit.log")
     detailed_file  = cfg.get("LOG", "DETAIL_FILE", fallback=None)
     rotate_mb      = cfg.getint("LOG", "ROTATE_MB", fallback=10)
 
@@ -267,11 +269,19 @@ async def _post_cancel_verify(ex_hub, targets: Optional[List[str]] = None) -> Di
 
 # ---------------- Main async ----------------
 
-async def async_main(cfg_path: str):
+async def async_main(cfg_path: str, db_path_override: Optional[str] = None):
     """Função principal assíncrona do bot."""
     cfg = load_config(cfg_path)
+    if db_path_override:
+        if "GLOBAL" not in cfg:
+            cfg["GLOBAL"] = {}
+        cfg["GLOBAL"]["SQLITE_PATH"] = os.path.abspath(db_path_override)
     ensure_directories()
     setup_logging_from_config(cfg)
+
+    resolved_db_path = os.path.abspath(cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db"))
+    log.info("[BOOT] DB_PATH=%s", resolved_db_path)
+    log.info("[BOOT] APP_VERSION=%s", APP_VERSION)
 
     s = config_summary(cfg)
 
@@ -476,7 +486,7 @@ def main():
         sys.exit(1)
     
     try:
-        asyncio.run(async_main(str(config_path)))
+        asyncio.run(async_main(str(config_path), db_path_override=args.db_path))
     except KeyboardInterrupt:
         print("\n⏹️  Interrompido pelo usuário.")
         sys.exit(0)

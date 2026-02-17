@@ -39,9 +39,23 @@ def _resolve_project_root() -> str:
 # PROJECT_ROOT = C:\...\1ARBIT  (ou pasta do .exe quando empacotado)
 PROJECT_ROOT = _resolve_project_root()
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config.txt")
+_DB_PATH_OVERRIDE: Optional[str] = None
+
+
+def set_db_path_override(db_path: Optional[str]) -> None:
+    global _DB_PATH_OVERRIDE
+    if db_path:
+        _DB_PATH_OVERRIDE = os.path.abspath(db_path)
+        logger.info("[BOOT] DB_PATH=%s", _DB_PATH_OVERRIDE)
+
+
+def get_effective_db_path() -> str:
+    return _resolve_sqlite_path(_load_config())
 
 
 def _resolve_sqlite_path(cfg: Optional[ConfigParser] = None) -> str:
+    if _DB_PATH_OVERRIDE:
+        return os.path.abspath(_DB_PATH_OVERRIDE)
     cfg = cfg or _load_config()
     if cfg.has_section("GLOBAL"):
         gsect = cfg["GLOBAL"]
@@ -851,6 +865,56 @@ def upsert_bot_config(payload: Dict[str, Any]):
         conn.close()
 
     return True, f"bot_config salvo para {pair}."
+
+def get_db_health() -> Dict[str, Any]:
+    db_path = get_effective_db_path()
+    writable = False
+    try:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE IF NOT EXISTS runtime_status (worker_pid INTEGER, started_at REAL, last_heartbeat_at REAL, db_path TEXT, version TEXT)")
+        conn.commit()
+        conn.close()
+        writable = True
+    except Exception as exc:
+        logger.warning("[health/db] writable check failed: %s", exc)
+    return {"status": "ok", "db_path": db_path, "writable": writable}
+
+
+def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
+    db_path = get_effective_db_path()
+    if not os.path.exists(db_path):
+        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT worker_pid, started_at, last_heartbeat_at, db_path, version
+            FROM runtime_status
+            ORDER BY COALESCE(last_heartbeat_at, 0) DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        conn.close()
+    except Exception as exc:
+        logger.warning("[health/worker] query failed: %s", exc)
+        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+
+    if row is None:
+        return {"status": "stale", "last_heartbeat_at": None, "worker_pid": None}
+
+    last_hb = float(row["last_heartbeat_at"] or 0.0)
+    worker_pid = int(row["worker_pid"] or 0)
+    is_stale = (time.time() - last_hb) > stale_after_sec
+    return {
+        "status": "stale" if is_stale else "ok",
+        "last_heartbeat_at": last_hb,
+        "worker_pid": worker_pid,
+        "started_at": float(row["started_at"] or 0.0),
+    }
+
 
 def debug_snapshot() -> Dict[str, Any]:
     """
