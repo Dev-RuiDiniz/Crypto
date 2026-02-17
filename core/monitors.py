@@ -160,7 +160,16 @@ class MainMonitor:
         self.print_every_sec = int(self.cfg.get("GLOBAL", "PRINT_EVERY_SEC", fallback="5"))
 
         raw_pairs = self.cfg.get("PAIRS", "LIST", fallback="")
-        self.pairs: List[str] = [p.strip().upper() for p in raw_pairs.split(",") if p.strip()]
+        cfg_pairs: List[str] = [p.strip().upper() for p in raw_pairs.split(",") if p.strip()]
+        db_pairs: List[str] = []
+        if hasattr(self.state, "get_enabled_pairs"):
+            try:
+                db_pairs = [p.strip().upper() for p in (self.state.get_enabled_pairs() or []) if p]
+            except Exception as e:
+                log.warning(f"[config_pairs] falha ao carregar pares do banco: {e}")
+
+        # Mantém pares do config e adiciona pares persistidos no banco sem duplicar.
+        self.pairs: List[str] = list(dict.fromkeys(cfg_pairs + db_pairs))
 
         # router thresholds/flags
         self.min_notional_usdt = float(
@@ -177,6 +186,8 @@ class MainMonitor:
         # técnico
         log.info(f"Exchanges habilitadas: {','.join(self.ex_hub.enabled_ids) or '(nenhuma)'}")
         log.info(f"Pares monitorados: {', '.join(self.pairs) or '(nenhum)'}")
+        if db_pairs:
+            log.info(f"Pares carregados de config_pairs (DB): {', '.join(db_pairs)}")
         # humano (mensagens pontuais; o resto vai no painel)
         ulog.info(f"Corretoras ativas: {', '.join(self.ex_hub.enabled_ids) or '(nenhuma)'}")
         ulog.info(f"Pares em operação: {', '.join(self.pairs) or '(nenhum)'}")
@@ -1053,6 +1064,11 @@ class MainMonitor:
 
                 try:
                     for pair in self.pairs:
+                        strategy_name = self.strategy.__class__.__name__
+                        log.info(
+                            f"[ExecutionEngine] {datetime.utcnow().isoformat()}Z - "
+                            f"Symbol: {pair} - Strategy: {strategy_name}"
+                        )
                         mids = await self._mid_per_exchange(pair)
                         mids_map[pair] = mids
                         ref = self._reference_price(pair, mids)
