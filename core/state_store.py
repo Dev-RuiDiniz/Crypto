@@ -53,6 +53,15 @@ class StateStore:
         cur = self._conn.cursor()
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS config_pairs (
+                symbol TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                updated_at REAL
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS orders (
                 id TEXT PRIMARY KEY,
                 ts REAL,
@@ -93,6 +102,40 @@ class StateStore:
             """
         )
         self._conn.commit()
+
+    @staticmethod
+    def _normalize_symbol(symbol: str) -> str:
+        s = (symbol or "").strip().upper().replace("-", "/")
+        if not s:
+            return ""
+        if "/" in s:
+            base, quote = s.split("/", 1)
+            return f"{base.strip()}/{quote.strip()}"
+        for quote in ("USDT", "USDC", "BRL", "BTC", "ETH"):
+            if s.endswith(quote) and len(s) > len(quote):
+                base = s[: -len(quote)]
+                if base:
+                    return f"{base}/{quote}"
+        return s
+
+    def get_enabled_pairs(self) -> List[str]:
+        """
+        Lista pares habilitados da tabela config_pairs para uso no scheduler/monitor.
+        """
+        try:
+            rows = self._conn.execute(
+                "SELECT symbol FROM config_pairs WHERE COALESCE(enabled, 1) = 1 ORDER BY symbol"
+            ).fetchall()
+        except Exception as e:
+            log.warning(f"[config_pairs] leitura falhou: {e}")
+            return []
+
+        out: List[str] = []
+        for row in rows:
+            normalized = self._normalize_symbol(str(row["symbol"] if isinstance(row, sqlite3.Row) else row[0]))
+            if normalized:
+                out.append(normalized)
+        return out
 
     def _ensure_csv_headers(self):
         if not os.path.exists(self._orders_csv):
