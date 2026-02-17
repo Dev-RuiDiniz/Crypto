@@ -10,6 +10,7 @@ import json
 import time
 import os
 import csv
+import threading
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
@@ -38,6 +39,7 @@ class StateStore:
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.row_factory = sqlite3.Row
+        self._tx_lock = threading.RLock()
         self._init_db()
 
         # CSV paths
@@ -86,8 +88,55 @@ class StateStore:
                 symbol_local TEXT,
                 price_local REAL,
                 amount REAL,
-                status TEXT
+                status TEXT,
+                tenant_id TEXT,
+                exchange TEXT,
+                client_order_id TEXT,
+                cycle_id TEXT,
+                exchange_order_id TEXT,
+                dedupe_state TEXT,
+                error_code TEXT,
+                retryable INTEGER,
+                created_at REAL,
+                updated_at REAL
             )
+            """
+        )
+        order_cols = {
+            str(r[1]).lower() for r in cur.execute("PRAGMA table_info(orders)").fetchall()
+        }
+        order_migrations = {
+            "tenant_id": "ALTER TABLE orders ADD COLUMN tenant_id TEXT",
+            "exchange": "ALTER TABLE orders ADD COLUMN exchange TEXT",
+            "client_order_id": "ALTER TABLE orders ADD COLUMN client_order_id TEXT",
+            "cycle_id": "ALTER TABLE orders ADD COLUMN cycle_id TEXT",
+            "exchange_order_id": "ALTER TABLE orders ADD COLUMN exchange_order_id TEXT",
+            "dedupe_state": "ALTER TABLE orders ADD COLUMN dedupe_state TEXT",
+            "error_code": "ALTER TABLE orders ADD COLUMN error_code TEXT",
+            "retryable": "ALTER TABLE orders ADD COLUMN retryable INTEGER",
+            "created_at": "ALTER TABLE orders ADD COLUMN created_at REAL",
+            "updated_at": "ALTER TABLE orders ADD COLUMN updated_at REAL",
+        }
+        for col, ddl in order_migrations.items():
+            if col not in order_cols:
+                cur.execute(ddl)
+        cur.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tenant_exchange_client_order_id
+            ON orders (tenant_id, exchange, client_order_id)
+            WHERE client_order_id IS NOT NULL AND client_order_id <> ''
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_orders_tenant_exchange_symbol_status
+            ON orders (tenant_id, exchange, pair, status)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_orders_tenant_exchange_cycle
+            ON orders (tenant_id, exchange, cycle_id)
             """
         )
         cur.execute(
@@ -578,11 +627,15 @@ class StateStore:
         """
         ts = time.time()
         try:
+            now_ts = float(ts)
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO orders
-                (id, ts, ex_name, pair, side, symbol_local, price_local, amount, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, ts, ex_name, pair, side, symbol_local, price_local, amount, status,
+                 tenant_id, exchange, client_order_id, cycle_id, exchange_order_id,
+                 dedupe_state, error_code, retryable, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        COALESCE((SELECT created_at FROM orders WHERE id = ?), ?), ?)
                 """,
                 (
                     str(live_order.order_id),
@@ -594,6 +647,17 @@ class StateStore:
                     float(live_order.price_local),
                     float(live_order.amount),
                     live_order.status,
+                    str(getattr(live_order, "tenant_id", "default") or "default"),
+                    str(getattr(live_order, "exchange", live_order.ex_name) or live_order.ex_name),
+                    str(getattr(live_order, "client_order_id", "") or ""),
+                    str(getattr(live_order, "cycle_id", "") or ""),
+                    str(getattr(live_order, "exchange_order_id", live_order.order_id) or live_order.order_id),
+                    str(getattr(live_order, "dedupe_state", "NEW") or "NEW"),
+                    None,
+                    None,
+                    str(live_order.order_id),
+                    now_ts,
+                    now_ts,
                 ),
             )
             self._conn.commit()
@@ -622,8 +686,8 @@ class StateStore:
         ts = time.time()
         try:
             self._conn.execute(
-                "UPDATE orders SET ts=?, status=? WHERE id=?",
-                (ts, "canceled", str(live_order.order_id)),
+                "UPDATE orders SET ts=?, status=?, updated_at=?, dedupe_state=COALESCE(dedupe_state, 'NEW') WHERE id=?",
+                (ts, "canceled", ts, str(live_order.order_id)),
             )
             self._conn.commit()
         except Exception as e:
@@ -646,6 +710,136 @@ class StateStore:
                     ])
             except Exception as e:
                 log.warning(f"[orders.csv] falha: {e}")
+
+    def get_or_create_order_intent(
+        self,
+        *,
+        tenant_id: str,
+        exchange: str,
+        client_order_id: str,
+        pair: str,
+        side: str,
+        symbol_local: str,
+        price_local: float,
+        amount: float,
+        cycle_id: str,
+    ) -> Dict[str, Any]:
+        now = float(time.time())
+        safe_tenant = str(tenant_id or "default")
+        safe_exchange = str(exchange or "")
+        safe_client = str(client_order_id or "")
+        safe_side = str(side or "").lower()
+        with self._tx_lock:
+            cur = self._conn.cursor()
+            cur.execute("BEGIN IMMEDIATE")
+            row = cur.execute(
+                """
+                SELECT * FROM orders
+                WHERE tenant_id = ? AND exchange = ? AND client_order_id = ?
+                LIMIT 1
+                """,
+                (safe_tenant, safe_exchange, safe_client),
+            ).fetchone()
+
+            if row:
+                status = str(row["status"] or "").lower()
+                dedupe_state = "REUSED"
+                should_submit = status not in {"pending", "placed", "open"}
+                retryable = bool((row["retryable"] if isinstance(row, sqlite3.Row) else 0) or 0)
+                if status == "failed" and not retryable:
+                    should_submit = False
+                    dedupe_state = "BLOCKED"
+                if should_submit:
+                    cur.execute(
+                        """
+                        UPDATE orders
+                        SET status='pending', updated_at=?, dedupe_state=?,
+                            pair=?, side=?, symbol_local=?, price_local=?, amount=?, cycle_id=?,
+                            error_code=NULL
+                        WHERE id=?
+                        """,
+                        (now, dedupe_state, pair, safe_side, symbol_local, float(price_local), float(amount), cycle_id, row["id"]),
+                    )
+                else:
+                    cur.execute("UPDATE orders SET updated_at=?, dedupe_state=? WHERE id=?", (now, dedupe_state, row["id"]))
+                self._conn.commit()
+                return {
+                    "id": row["id"],
+                    "client_order_id": safe_client,
+                    "status": row["status"],
+                    "dedupe_state": dedupe_state,
+                    "should_submit": should_submit,
+                }
+
+            intent_id = f"intent::{safe_exchange}::{safe_client}"
+            cur.execute(
+                """
+                INSERT INTO orders
+                (id, ts, ex_name, pair, side, symbol_local, price_local, amount, status,
+                 tenant_id, exchange, client_order_id, cycle_id, exchange_order_id,
+                 dedupe_state, error_code, retryable, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NULL, 'NEW', NULL, NULL, ?, ?)
+                """,
+                (
+                    intent_id,
+                    now,
+                    safe_exchange,
+                    pair,
+                    safe_side,
+                    symbol_local,
+                    float(price_local),
+                    float(amount),
+                    safe_tenant,
+                    safe_exchange,
+                    safe_client,
+                    str(cycle_id or ""),
+                    now,
+                    now,
+                ),
+            )
+            self._conn.commit()
+            return {
+                "id": intent_id,
+                "client_order_id": safe_client,
+                "status": "pending",
+                "dedupe_state": "NEW",
+                "should_submit": True,
+            }
+
+    def mark_order_submitted(self, *, tenant_id: str, exchange: str, client_order_id: str, exchange_order_id: str, status: str = "open") -> None:
+        now = float(time.time())
+        with self._tx_lock:
+            self._conn.execute(
+                """
+                UPDATE orders
+                SET id = CASE WHEN id LIKE 'intent::%' THEN ? ELSE id END,
+                    exchange_order_id = ?,
+                    status = ?,
+                    updated_at = ?,
+                    ts = ?,
+                    retryable = 1
+                WHERE tenant_id=? AND exchange=? AND client_order_id=?
+                """,
+                (str(exchange_order_id), str(exchange_order_id), str(status or "open").lower(), now, now, str(tenant_id), str(exchange), str(client_order_id)),
+            )
+            self._conn.commit()
+
+    def mark_order_failed(self, *, tenant_id: str, exchange: str, client_order_id: str, error_code: str, retryable: bool) -> None:
+        now = float(time.time())
+        with self._tx_lock:
+            self._conn.execute(
+                """
+                UPDATE orders
+                SET status='failed',
+                    error_code=?,
+                    retryable=?,
+                    updated_at=?,
+                    ts=?
+                WHERE tenant_id=? AND exchange=? AND client_order_id=?
+                """,
+                (str(error_code or "unknown"), 1 if retryable else 0, now, now, str(tenant_id), str(exchange), str(client_order_id)),
+            )
+            self._conn.commit()
 
     def record_paper_order(self, payload: Dict[str, Any]) -> None:
         ts = time.time()

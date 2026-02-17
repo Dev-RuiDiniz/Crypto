@@ -1060,6 +1060,7 @@ class MainMonitor:
             if not created_at:
                 created_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
+            client_order_id = str(o.get("clientOrderId") or o.get("client_order_id") or "")
             out = {
                 "id": str(o.get("id") or o.get("orderId") or ""),
                 "exchange": ex_name,
@@ -1070,6 +1071,9 @@ class MainMonitor:
                 "amount": amount,
                 "status": status,
                 "created_at": created_at,
+                "client_order_id": client_order_id,
+                "client_order_id_short": (client_order_id[-10:] if client_order_id else ""),
+                "dedupe_state": str(o.get("dedupe_state") or ""),
             }
 
             snap["orders"][status].append(out)
@@ -1128,6 +1132,7 @@ class MainMonitor:
 
                         order_id = oid or f"pending::{ex_name}::{pair}::{side_key}"
 
+                        client_order_id = str(rec.get("client_order_id") or "")
                         out = {
                             "id": order_id,
                             "exchange": ex_name,
@@ -1138,6 +1143,9 @@ class MainMonitor:
                             "amount": amount,
                             "status": status,
                             "created_at": created_at,
+                            "client_order_id": client_order_id,
+                            "client_order_id_short": str(rec.get("client_order_id_short") or (client_order_id[-10:] if client_order_id else "")),
+                            "dedupe_state": str(rec.get("dedupe_state") or ""),
                         }
 
                         snap["orders"][status].append(out)
