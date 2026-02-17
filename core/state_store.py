@@ -151,21 +151,33 @@ class StateStore:
                 out.append(normalized)
         return out
 
-    def get_enabled_bot_configs(self) -> List[Dict[str, Any]]:
+    def get_bot_configs(self, enabled_only: Optional[bool] = None) -> List[Dict[str, Any]]:
         """
-        Retorna bot_config habilitados no formato esperado pelo executor.
+        Retorna bot_config no formato esperado pelo executor.
+
+        enabled_only:
+          - True: somente habilitados
+          - False: somente desabilitados
+          - None: todos
         """
+        where_clause = ""
+        if enabled_only is True:
+            where_clause = "WHERE COALESCE(enabled, 1) = 1"
+        elif enabled_only is False:
+            where_clause = "WHERE COALESCE(enabled, 1) = 0"
+
         try:
             rows = self._conn.execute(
-                """
+                f"""
                 SELECT
                     symbol,
                     COALESCE(strategy, 'StrategySpread') AS strategy,
                     COALESCE(risk_percentage, 0) AS risk_percentage,
                     COALESCE(max_daily_loss, 0) AS max_daily_loss,
-                    COALESCE(enabled, 1) AS enabled
+                    COALESCE(enabled, 1) AS enabled,
+                    updated_at
                 FROM config_pairs
-                WHERE COALESCE(enabled, 1) = 1
+                {where_clause}
                 ORDER BY symbol
                 """
             ).fetchall()
@@ -186,9 +198,16 @@ class StateStore:
                     "risk_percentage": float((row["risk_percentage"] if isinstance(row, sqlite3.Row) else row[2]) or 0.0),
                     "max_daily_loss": float((row["max_daily_loss"] if isinstance(row, sqlite3.Row) else row[3]) or 0.0),
                     "enabled": bool((row["enabled"] if isinstance(row, sqlite3.Row) else row[4]) or 0),
+                    "updated_at": float((row["updated_at"] if isinstance(row, sqlite3.Row) else row[5]) or 0.0),
                 }
             )
         return out
+
+    def get_enabled_bot_configs(self) -> List[Dict[str, Any]]:
+        """
+        Retorna bot_config habilitados no formato esperado pelo executor.
+        """
+        return self.get_bot_configs(enabled_only=True)
 
     def _ensure_csv_headers(self):
         if not os.path.exists(self._orders_csv):
