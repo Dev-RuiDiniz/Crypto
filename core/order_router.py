@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 from typing import Optional, Tuple, List, Dict, Any
 import configparser
@@ -680,11 +681,19 @@ class OrderRouter:
         sec = self.cfg.get(sect, "API_SECRET", fallback="").strip()
         return bool(api and sec)
 
-    def _build_client_order_id(self, ex_name: str, pair: str, side_l: str, symbol_local: str) -> str:
-        bucket = int(time.time() // 5)
+    def _build_client_order_id(self, ex_name: str, pair: str, side_l: str, cycle_id: str, intent: str = "") -> str:
         tenant = str(getattr(self.ex_hub, "tenant_id", "default"))
-        raw = f"{tenant}:{ex_name}:{pair}:{symbol_local}:{side_l}:{bucket}"
-        return raw.replace("/", "-").replace(":", "-")[:48]
+        raw = f"{tenant}|{ex_name}|{pair}|{side_l}|{cycle_id}|{intent or '-'}"
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+        ex_tag = str(ex_name).lower().replace("_", "")[:6]
+        return f"COID-{ex_tag}-{digest}"[:40]
+
+    @staticmethod
+    def _short_client_order_id(client_order_id: str) -> str:
+        txt = str(client_order_id or "")
+        if len(txt) <= 10:
+            return txt
+        return txt[-10:]
 
     def _is_duplicate_submit(self, key: str) -> bool:
         now = time.time()
@@ -706,6 +715,7 @@ class OrderRouter:
         qty_local: float,
         price_usdt: float,
         price_local: float,
+        cycle_id: str,
     ) -> Dict[str, Any]:
         """
         Tenta via ExchangeHub.create_limit_order (preço em USDT).
@@ -714,19 +724,67 @@ class OrderRouter:
         # 1) SEMPRE tentar via hub primeiro (MB v4 e afins) - CORRIGIDO
         try:
             if hasattr(self.ex_hub, "create_limit_order"):
-                client_order_id = self._build_client_order_id(ex_name, pair, side_l, symbol_local)
+                intent = f"{symbol_local}:{round(float(qty_local), 8)}:{round(float(price_usdt), 8)}"
+                client_order_id = self._build_client_order_id(ex_name, pair, side_l, cycle_id=cycle_id, intent=intent)
+                state_row = self.state.get_or_create_order_intent(
+                    tenant_id=str(getattr(self.ex_hub, "tenant_id", "default")),
+                    exchange=ex_name,
+                    client_order_id=client_order_id,
+                    pair=pair,
+                    side=side_l,
+                    symbol_local=symbol_local,
+                    price_local=float(price_local),
+                    amount=float(qty_local),
+                    cycle_id=str(cycle_id or ""),
+                )
+                dedupe_state = str(state_row.get("dedupe_state") or "NEW")
+                if not bool(state_row.get("should_submit", True)):
+                    log.info(
+                        f"[{pair}] dedupe_state={dedupe_state} skip create ex={ex_name} side={side_l} coid={self._short_client_order_id(client_order_id)}"
+                    )
+                    return {
+                        "id": str(state_row.get("id") or ""),
+                        "status": str(state_row.get("status") or "pending"),
+                        "clientOrderId": client_order_id,
+                        "dedupe_state": dedupe_state,
+                        "reused": dedupe_state != "NEW",
+                        "info": {"deduped": True},
+                    }
                 submit_hash = f"{ex_name}:{pair}:{symbol_local}:{side_l}:{round(float(qty_local), 8)}:{round(float(price_usdt), 8)}:{client_order_id}"
                 if self._is_duplicate_submit(submit_hash):
                     log.warning(f"[{pair}] duplicate submit prevented ex={ex_name} side={side_l} symbol={symbol_local}")
-                    return {}
-                return await self.ex_hub.create_limit_order(
-                    ex_name=ex_name,
-                    global_pair=pair,
-                    side=side_l,
-                    amount=float(qty_local),
-                    price_usdt=float(price_usdt),
-                    params={"clientOrderId": client_order_id},
-                )
+                    return {"id": str(state_row.get("id") or ""), "status": "pending", "clientOrderId": client_order_id, "dedupe_state": "BLOCKED", "reused": True}
+                try:
+                    resp = await self.ex_hub.create_limit_order(
+                        ex_name=ex_name,
+                        global_pair=pair,
+                        side=side_l,
+                        amount=float(qty_local),
+                        price_usdt=float(price_usdt),
+                        params={"clientOrderId": client_order_id},
+                    )
+                    oid = str((resp or {}).get("id") or (resp or {}).get("orderId") or state_row.get("id") or "")
+                    self.state.mark_order_submitted(
+                        tenant_id=str(getattr(self.ex_hub, "tenant_id", "default")),
+                        exchange=ex_name,
+                        client_order_id=client_order_id,
+                        exchange_order_id=oid,
+                        status=str((resp or {}).get("status") or "open"),
+                    )
+                    out = dict(resp or {})
+                    out["clientOrderId"] = client_order_id
+                    out["dedupe_state"] = dedupe_state
+                    out["reused"] = dedupe_state != "NEW"
+                    return out
+                except Exception as submit_exc:
+                    self.state.mark_order_failed(
+                        tenant_id=str(getattr(self.ex_hub, "tenant_id", "default")),
+                        exchange=ex_name,
+                        client_order_id=client_order_id,
+                        error_code=type(submit_exc).__name__,
+                        retryable=True,
+                    )
+                    raise
         except Exception as e:
             msg = str(e)
             log.info(f"[{pair}] {ex_name} hub.create_limit_order falhou: {msg}")
@@ -760,6 +818,7 @@ class OrderRouter:
         side: str,
         price_usdt: float,
         pair: str,
+        cycle_id: str,
         min_notional_usdt: float,
         risk_percentage: float = 0.0,
         max_daily_loss: float = 0.0,
@@ -862,6 +921,7 @@ class OrderRouter:
                 qty_local=float(qty_local),
                 price_usdt=float(price_usdt),
                 price_local=float(price_local),
+                cycle_id=str(cycle_id or ""),
             )
 
             # Robustez: só segue se veio um dict com id
@@ -870,6 +930,8 @@ class OrderRouter:
                 return
 
             oid = order.get("id") or order.get("orderId") or "?"
+            client_order_id = str(order.get("clientOrderId") or "")
+            dedupe_state = str(order.get("dedupe_state") or ("REUSED" if order.get("reused") else "NEW"))
 
             if bool((order.get("info") or {}).get("paper")):
                 self._record_paper_execution(
@@ -902,6 +964,9 @@ class OrderRouter:
                 "ex": ex_name,
                 "symbol": symbol_local,
                 "oid": oid,
+                "client_order_id": client_order_id,
+                "client_order_id_short": self._short_client_order_id(client_order_id),
+                "dedupe_state": dedupe_state,
                 "price_local": float(price_local),
                 "price_usdt": float(price_usdt),
                 "qty": float(qty_local),
@@ -952,6 +1017,7 @@ class OrderRouter:
         ex_name: str,
         side: str,
         spread: float,
+        cycle_id: str,
         risk_percentage: float = 0.0,
         max_daily_loss: float = 0.0,
     ):
@@ -975,6 +1041,7 @@ class OrderRouter:
                 side="buy",
                 price_usdt=float(target_u),
                 pair=pair,
+                cycle_id=str(cycle_id or ""),
                 min_notional_usdt=float(self.min_router_notional),
                 risk_percentage=float(risk_percentage or 0.0),
                 max_daily_loss=float(max_daily_loss or 0.0),
@@ -995,6 +1062,7 @@ class OrderRouter:
                 side="sell",
                 price_usdt=float(target_u),
                 pair=pair,
+                cycle_id=str(cycle_id or ""),
                 min_notional_usdt=float(self.min_router_notional),
                 risk_percentage=float(risk_percentage or 0.0),
                 max_daily_loss=float(max_daily_loss or 0.0),
@@ -1009,7 +1077,11 @@ class OrderRouter:
         min_notional_usdt: float = 0.0,
         risk_percentage: float = 0.0,
         max_daily_loss: float = 0.0,
+        cycle_id: Optional[str] = None,
     ):
+        if not cycle_id:
+            cycle_bucket = int(time.time() // 30)
+            cycle_id = f"{pair}:{cycle_bucket}:{round(float(ref_usdt or 0.0),6)}:{round(float(buy_target_usdt or 0.0),6)}:{round(float(sell_target_usdt or 0.0),6)}"
         if self.anchor_mode == "LOCAL":
             buy_spread, sell_spread = self._pair_spreads(pair)
             log.info(f"[{pair}] reprice(LOCAL): spreads buy={buy_spread:.4f} sell={sell_spread:.4f}")
@@ -1020,6 +1092,7 @@ class OrderRouter:
                     ex_name,
                     "buy",
                     buy_spread,
+                    str(cycle_id),
                     risk_percentage=float(risk_percentage or 0.0),
                     max_daily_loss=float(max_daily_loss or 0.0),
                 )
@@ -1029,6 +1102,7 @@ class OrderRouter:
                         ex_name,
                         "sell",
                         sell_spread,
+                        str(cycle_id),
                         risk_percentage=float(risk_percentage or 0.0),
                         max_daily_loss=float(max_daily_loss or 0.0),
                     )
@@ -1047,6 +1121,7 @@ class OrderRouter:
             await self._reprice_one(
                 ex_name=ex_name, symbol_local=symbol_local, side="buy",
                 price_usdt=float(buy_target_usdt), pair=pair,
+                cycle_id=str(cycle_id),
                 min_notional_usdt=float(min_notional_usdt or self.min_router_notional),
                 risk_percentage=float(risk_percentage or 0.0),
                 max_daily_loss=float(max_daily_loss or 0.0),
@@ -1064,6 +1139,7 @@ class OrderRouter:
             await self._reprice_one(
                 ex_name=ex_name, symbol_local=symbol_local, side="sell",
                 price_usdt=float(sell_target_usdt), pair=pair,
+                cycle_id=str(cycle_id),
                 min_notional_usdt=float(min_notional_usdt or self.min_router_notional),
                 risk_percentage=float(risk_percentage or 0.0),
                 max_daily_loss=float(max_daily_loss or 0.0),
@@ -1071,8 +1147,8 @@ class OrderRouter:
         else:
             log.warning(f"[{pair}] SELL: nenhuma exchange com saldo suficiente.")
 
-    async def reprice(self, pair: str, buy_tgt_usdt: float, sell_tgt_usdt: float) -> None:
-        await self.reprice_pair(pair, ref_usdt=0.0, buy_target_usdt=buy_tgt_usdt, sell_target_usdt=sell_tgt_usdt)
+    async def reprice(self, pair: str, buy_tgt_usdt: float, sell_tgt_usdt: float, cycle_id: Optional[str] = None) -> None:
+        await self.reprice_pair(pair, ref_usdt=0.0, buy_target_usdt=buy_tgt_usdt, sell_target_usdt=sell_tgt_usdt, cycle_id=cycle_id)
 
     # ------------------------- suporte REF: escolhas por orderbook/mids -------------------------
 
@@ -1177,6 +1253,7 @@ class OrderRouter:
             side=opposite,
             price_usdt=float(target_u),
             pair=pair,
+            cycle_id=f"postfill:{pair}:{int(time.time() // 30)}:{opposite}",
             min_notional_usdt=float(self.min_router_notional),
             cancel_before=True,
             amount_override=amount_override,

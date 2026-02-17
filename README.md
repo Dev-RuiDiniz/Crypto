@@ -16,10 +16,17 @@ Este repositório contém um bot de trading spot multipar com execução local, 
 ## O que ainda não está completo
 - Streaming websocket de order book no loop principal (hoje: polling).
 - Estratégia explícita de arbitragem simples (detector + execução de duas pernas).
-- Idempotência forte de ordens com `clientOrderId` persistente.
 
 ---
 
+
+## Idempotência de ordens (Sprint 5)
+- Criação de ordens com `clientOrderId` determinístico por intent/ciclo.
+- Dedupe transacional em SQLite (`UNIQUE(tenant_id, exchange, client_order_id)`).
+- Dashboard exibe `clientOrderId` curto e estado de dedupe (`NEW/REUSED/BLOCKED`).
+- Detalhes: `docs/sprint-5/README.md`.
+
+---
 ## Arquitetura resumida
 ```text
 config.txt + DB config -> bot.py/MainMonitor

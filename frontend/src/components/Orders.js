@@ -65,6 +65,8 @@ export function Orders({ pending, open, closed, activeTab, onTabChange }) {
                 e("th", null, "Preço"),
                 e("th", null, "Qtd"),
                 e("th", null, "Status"),
+                e("th", null, "ClientOrderId"),
+                e("th", null, "Dedupe"),
                 e("th", null, "Criada em")
               )
             ),
@@ -93,6 +95,8 @@ export function Orders({ pending, open, closed, activeTab, onTabChange }) {
                   e("td", null, formatNumber(o.price, 2)), // preço 2 casas
                   e("td", null, formatNumber(o.amount, 4)), // qty 4 casas
                   e("td", null, o.status || "—"),
+                  e("td", null, o.client_order_id_short || o.client_order_id || "—"),
+                  e("td", null, o.dedupe_state ? e("span", { className: `dedupe-badge dedupe-${String(o.dedupe_state || "").toLowerCase()}` }, o.dedupe_state) : "—"),
                   e("td", null, o.created_at || "—")
                 );
               })
