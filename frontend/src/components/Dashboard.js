@@ -1,5 +1,7 @@
 // frontend/src/components/Dashboard.js
 
+import { api } from "../utils/api.js";
+
 const React = window.React;
 const { useState, useEffect } = React;
 const e = React.createElement;
@@ -32,6 +34,8 @@ export function Dashboard(props) {
 
   const [error, setError] = useState(null);
   const [orderbookStatus, setOrderbookStatus] = useState([]);
+  const [metrics, setMetrics] = useState({});
+  const [configStatus, setConfigStatus] = useState({});
 
   // Loop de atualização
   useEffect(() => {
@@ -47,14 +51,18 @@ export function Dashboard(props) {
           ordersOpenJson,
           ordersClosedJson,
           midsJson,
-          obStatusJson
+          obStatusJson,
+          metricsJson,
+          cfgStatusJson
         ] = await Promise.all([
           fetchJson(`${API_BASE}/balances`),
           fetchJson(`${API_BASE}/orders?state=pending`),
           fetchJson(`${API_BASE}/orders?state=open`),
           fetchJson(`${API_BASE}/orders?state=closed`),
           fetchJson(`${API_BASE}/mids?pair=${encodeURIComponent(pair)}`),
-          fetchJson(`${API_BASE}/tenants/default/marketdata/orderbook-status`)
+          fetchJson(`${API_BASE}/tenants/default/marketdata/orderbook-status`),
+          api.getMetrics("default"),
+          fetchJson(`${API_BASE}/config-status`)
         ]);
 
         if (cancelled) return;
@@ -65,6 +73,8 @@ export function Dashboard(props) {
         setOrdersClosed((ordersClosedJson && ordersClosedJson.orders) || []);
         setMids((midsJson && midsJson.mids) || {});
         setOrderbookStatus((obStatusJson && obStatusJson.items) || []);
+        setMetrics(metricsJson || {});
+        setConfigStatus(cfgStatusJson || {});
         setError(null);
 
         if (!hasLoadedOnce) {
@@ -234,6 +244,37 @@ export function Dashboard(props) {
   }
 
 
+
+
+  function renderOperationalStatus() {
+    const cb = metrics.circuitBreakerState || {};
+    const wsItems = ((metrics.wsState || {}).items || []);
+    const cbOpen = Object.entries(cb).find(([, val]) => (val || {}).state === "OPEN");
+    const wsFallback = wsItems.find((r) => String((r && r.state) || "").toUpperCase() === "POLL_ACTIVE");
+
+    let status = "RUNNING";
+    let reason = "Sistema operando normalmente";
+    if ((configStatus.worker_status || "").toLowerCase() !== "ok") {
+      status = "PAUSED";
+      reason = "Worker offline/stale";
+    } else if (cbOpen) {
+      status = "DEGRADED";
+      reason = `Circuit breaker open (${cbOpen[0]})`;
+    } else if (wsFallback) {
+      status = "DEGRADED";
+      reason = "MarketData fallback active";
+    }
+
+    return e("div", { className: "panel" },
+      e("h2", null, "Status do Sistema"),
+      e("div", { className: "mids-line" },
+        e("strong", null, status),
+        " · ",
+        reason
+      ),
+      e("p", { className: "panel-subtitle" }, `Latência média: ${metrics.cycleLatencyMs || 0} ms | Ordens/min: ${metrics.ordersPerMinute || 0}`)
+    );
+  }
 
   function renderMarketDataPanel() {
     if (!orderbookStatus.length) {
@@ -411,6 +452,7 @@ export function Dashboard(props) {
           e("div", { className: "panel-header" }, e("h2", null, "Saldos por corretora")),
           renderBalances()
         ),
+        renderOperationalStatus(),
         renderMidsPanel(),
         renderMarketDataPanel()
       )

@@ -6,6 +6,7 @@ import { Dashboard } from "./components/Dashboard.js";
 import { BotConfigPanel } from "./components/BotConfigPanel.js";
 import { ExchangesSettings } from "./components/ExchangesSettings.js";
 import { NotificationsSettings } from "./components/NotificationsSettings.js";
+import { GoLiveChecklist } from "./components/GoLiveChecklist.js";
 
 const REFRESH_MS = 2000;
 
@@ -39,7 +40,8 @@ export default function App() {
           { className: "tabs" },
           e("button", { className: "tab-button" + (activeTab === "dashboard" ? " tab-button-active" : ""), onClick: () => setActiveTab("dashboard") }, "Dashboard"),
           e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Config do Bot (DB)"),
-          e("button", { className: "tab-button" + (activeTab === "settings" ? " tab-button-active" : ""), onClick: () => setActiveTab("settings") }, "Configurações")
+          e("button", { className: "tab-button" + (activeTab === "settings" ? " tab-button-active" : ""), onClick: () => setActiveTab("settings") }, "Configurações"),
+          e("button", { className: "tab-button" + (activeTab === "go-live" ? " tab-button-active" : ""), onClick: () => setActiveTab("go-live") }, "Go Live")
         )
       )
     ),
@@ -60,7 +62,9 @@ export default function App() {
             )
           : activeTab === "bot-config"
             ? e(BotConfigPanel)
-            : e(React.Fragment, null,
+            : activeTab === "go-live"
+              ? e(GoLiveChecklist)
+              : e(React.Fragment, null,
                 e("div", { className: "panel" },
                   e("h2", null, "Configurações"),
                   e("div", { className: "tabs" },

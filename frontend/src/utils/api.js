@@ -72,6 +72,8 @@ export const api = {
   getArbitrageStatus: (pair) => request(`/api/arbitrage-status?pair=${encodeURIComponent(pair)}`),
   getConfigLegacy: () => request("/api/config"),
   getRiskEvents: (tenantId, symbol) => request(`/api/tenants/${encodeURIComponent(tenantId)}/risk/events?symbol=${encodeURIComponent(symbol || "")}`),
+  getMetrics: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/metrics`),
+  getGoLiveChecklist: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/go-live-checklist`),
 
   getExchangeCredentials: (tenantId) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials`),
   createExchangeCredential: (tenantId, payload) => request(`/api/tenants/${encodeURIComponent(tenantId)}/exchange-credentials`, { method: "POST", body: JSON.stringify(payload) }),

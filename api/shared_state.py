@@ -52,6 +52,8 @@ def _ensure_basic_keys(data: Dict[str, Any]) -> Dict[str, Any]:
     # events é opcional – só garante que exista se o produtor mandar
     if "events" not in data:
         data["events"] = []
+    if "metrics" not in data:
+        data["metrics"] = {}
     return data
 
 

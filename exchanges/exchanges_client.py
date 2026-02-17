@@ -33,6 +33,9 @@ from .adapters import MBV4Adapter
 from core.credentials_service import ExchangeCredentialsService, CredentialsNotFoundError
 from core.credential_provider import CredentialProvider
 from core.exchange_client_manager import ExchangeClientFactory, ExchangeClientManager
+from core.exchange_circuit_breaker import ExchangeCircuitBreaker
+from core.metrics_service import MetricsService
+from core.notification_service import NotificationEventType, NotificationSeverity
 
 log = get_logger("exchanges")
 
@@ -135,6 +138,13 @@ class ExchangeHub:
         self._markets_loaded: Dict[str, bool] = {}
         self.symbol_map = self._build_symbol_map()
         self.market_data = None
+        self.circuit_breaker = ExchangeCircuitBreaker(
+            failure_threshold=int(self.cfg.get("GLOBAL", "CB_FAILURE_THRESHOLD", fallback="5")),
+            open_backoff_sec=float(self.cfg.get("GLOBAL", "CB_OPEN_BACKOFF_SEC", fallback="30")),
+        )
+        self.metrics = MetricsService(
+            window_sec=int(self.cfg.get("GLOBAL", "METRICS_WINDOW_SEC", fallback="60"))
+        )
 
         # Adapter nativo MB v4 (privadas)
         self.mb_v4: Optional[MBV4Adapter] = None
@@ -649,6 +659,11 @@ class ExchangeHub:
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         params = params or {}
+        allowed, cb_state = self.circuit_breaker.allow_request(self.tenant_id, ex_name)
+        self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
+        if not allowed:
+            self.metrics.record_exchange_error(self.tenant_id, ex_name)
+            raise RuntimeError(f"circuit_breaker_open exchange={ex_name} state={cb_state}")
         side = side.lower()
         symbol_local = self._pick_symbol(ex_name, side, global_pair)
         price_local = self.from_usdt(ex_name, symbol_local, price_usdt)
@@ -660,6 +675,9 @@ class ExchangeHub:
             log.info(f"[{ex_name}] Preço convertido: {price_usdt} USDT -> {price_local_antes} BRL -> {price_local} BRL (arredondado)")
 
         if self.mode == "PAPER":
+            self.circuit_breaker.on_success(self.tenant_id, ex_name)
+            self.metrics.record_order_created(self.tenant_id)
+            self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
             return {
                 "id": f"paper_{ex_name}_{global_pair}_{side}",
                 "symbol": symbol_local,
@@ -675,6 +693,9 @@ class ExchangeHub:
         if ex_name.lower() == "mercadobitcoin" and self.mb_v4 and self.mb_v4.enabled:
             try:
                 resp = await self.mb_v4.create_limit_order(symbol_local, side, float(amount), float(price_local))
+                self.circuit_breaker.on_success(self.tenant_id, ex_name)
+                self.metrics.record_order_created(self.tenant_id)
+                self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
                 return {
                     "id": resp.id,
                     "symbol": resp.symbol or symbol_local,
@@ -686,6 +707,23 @@ class ExchangeHub:
                     "info": {"mb_v4": True},
                 }
             except Exception as e:
+                self.metrics.record_exchange_error(self.tenant_id, ex_name)
+                opened = self.circuit_breaker.on_failure(self.tenant_id, ex_name)
+                self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
+                if opened and self.notification_service is not None:
+                    self.notification_service.notify_nowait(
+                        tenant_id=self.tenant_id,
+                        event_type=NotificationEventType.AUTH_FAILED,
+                        severity=NotificationSeverity.ERROR,
+                        payload={
+                            "symbol": global_pair,
+                            "exchange": ex_name,
+                            "amount": float(amount),
+                            "price": float(price_usdt),
+                            "reason": "CIRCUIT_BREAKER_OPEN",
+                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        },
+                    )
                 log.error(f"[MB v4] create_limit_order falhou: {e}")
                 # Fallback para CCXT se disponível
                 if ex_name in self.exchanges:
@@ -705,8 +743,29 @@ class ExchangeHub:
             return await _do()
 
         try:
-            return await self.client_manager.run_with_operation_lock(ex_name, _call)
+            resp = await self.client_manager.run_with_operation_lock(ex_name, _call)
+            self.circuit_breaker.on_success(self.tenant_id, ex_name)
+            self.metrics.record_order_created(self.tenant_id)
+            self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
+            return resp
         except Exception as e:
+            self.metrics.record_exchange_error(self.tenant_id, ex_name)
+            opened = self.circuit_breaker.on_failure(self.tenant_id, ex_name)
+            self.metrics.set_circuit_breaker_state(self.tenant_id, self.circuit_breaker.export_states(self.tenant_id))
+            if opened and self.notification_service is not None:
+                self.notification_service.notify_nowait(
+                    tenant_id=self.tenant_id,
+                    event_type=NotificationEventType.AUTH_FAILED,
+                    severity=NotificationSeverity.ERROR,
+                    payload={
+                        "symbol": global_pair,
+                        "exchange": ex_name,
+                        "amount": float(amount),
+                        "price": float(price_usdt),
+                        "reason": "CIRCUIT_BREAKER_OPEN",
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    },
+                )
             await self.client_manager.mark_auth_failed_and_pause(ex_name, e)
             raise
 

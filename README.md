@@ -152,3 +152,27 @@ Bloqueios ficam persistidos em `risk_events` e podem ser consultados via API par
 
 O projeto suporta alertas externos por tenant (Email SMTP e Webhook/WhatsApp opcional), com filtro por severidade/evento, rate-limit e teste manual no dashboard em **Configurações → Notificações**. Veja detalhes em `docs/sprint-9/README.md`.
 
+
+## Sprint 10 — Hardening Operacional e Entrega Final
+
+### Novos recursos
+- Circuit breaker por exchange (escopo `tenant + exchange`) para proteger envio de ordens.
+- Métricas operacionais mínimas em `/api/tenants/{tenantId}/metrics`.
+- Status operacional global no dashboard (RUNNING/DEGRADED/PAUSED com motivo).
+- Página **Go Live** com checklist automático.
+
+### Observabilidade
+- Métricas expostas: latência de ciclo, ordens/min, erros por exchange, estado WS e circuit breaker.
+- Snapshot da API inclui bloco `metrics` para integração frontend/API.
+
+### Operação
+- Execute worker + API + frontend como já documentado.
+- Para operação em papel, use `GLOBAL.MODE=PAPER`.
+- Para operação live, valide checklist Go Live antes do start.
+
+### Documentação complementar
+- `docs/production-runbook.md`
+- `docs/troubleshooting.md`
+- `docs/sprint-10/auditoria.md`
+- `docs/sprint-10/demo-checklist.md`
+- `DELIVERY_SUMMARY.md`

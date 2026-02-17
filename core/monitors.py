@@ -251,6 +251,7 @@ class MainMonitor:
         self._last_snapshot_json: str = ""
         self._last_open_orders_snapshot: List[Dict[str, Any]] = []
         self._marketdata_rows: List[Dict[str, Any]] = []
+        self.metrics_service = getattr(self.ex_hub, "metrics", None)
 
         ulog.info(f"[MONITOR] snapshot_path configurado para: {self.snapshot_path}")
 
@@ -982,6 +983,7 @@ class MainMonitor:
             },
             "events": list(self._events[-self._events_max:]),
             "orderbook_status": list(self._marketdata_rows),
+            "metrics": self.metrics_service.get_metrics(getattr(self.ex_hub, "tenant_id", "default")) if self.metrics_service else {},
         }
 
         # ---------- balances ----------
@@ -1365,6 +1367,8 @@ class MainMonitor:
                     md = getattr(self.ex_hub, "market_data", None)
                     if md is not None:
                         self._marketdata_rows = await md.get_status_rows()
+                        if self.metrics_service is not None:
+                            self.metrics_service.set_ws_state(getattr(self.ex_hub, "tenant_id", "default"), list(self._marketdata_rows))
                 except Exception as e:
                     log.warning(f"[snapshot] erro ao atualizar marketdata status: {e}")
 
@@ -1389,6 +1393,8 @@ class MainMonitor:
                     pass
 
                 elapsed_ms = int((time.time() - t0) * 1000)
+                if self.metrics_service is not None:
+                    self.metrics_service.record_cycle_latency(getattr(self.ex_hub, "tenant_id", "default"), elapsed_ms)
                 sleep_ms = max(0, self.loop_interval_ms - elapsed_ms)
                 await asyncio.sleep(sleep_ms / 1000.0 if sleep_ms > 0 else 0)
 

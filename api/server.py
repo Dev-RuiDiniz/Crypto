@@ -283,6 +283,16 @@ def api_risk_events(tenantId: str):
     limit = int(request.args.get("limit", "50") or 50)
     return jsonify(handlers.get_risk_events(tenant_id=tenantId, symbol=symbol, limit=limit))
 
+@app.route("/api/tenants/<tenantId>/metrics")
+def api_tenant_metrics(tenantId: str):
+    return jsonify(handlers.get_tenant_metrics(tenantId))
+
+
+@app.route("/api/tenants/<tenantId>/go-live-checklist")
+def api_go_live_checklist(tenantId: str):
+    return jsonify(handlers.get_go_live_checklist(tenantId))
+
+
 @app.route("/api/tenants/<tenantId>/marketdata/orderbook-status")
 def api_marketdata_orderbook_status(tenantId: str):
     exchange = request.args.get("exchange", "")

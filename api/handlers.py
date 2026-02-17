@@ -182,6 +182,7 @@ def _empty_snapshot() -> Dict[str, Any]:
         "mids": {},
         "orders": [],
         "events": [],  # lista de strings (eventos humanos do painel)
+        "metrics": {},
     }
 
 
@@ -307,6 +308,7 @@ def _normalize_snapshot_structure(snap: Dict[str, Any]) -> Dict[str, Any]:
     snap.setdefault("mids", {})
     snap.setdefault("orders", [])
     snap.setdefault("events", [])  # sempre garante lista de eventos
+    snap.setdefault("metrics", {})
     return snap
 
 
@@ -1493,6 +1495,88 @@ def get_config_status(stale_after_sec: int = 30) -> Dict[str, Any]:
 
 
 
+
+
+def get_tenant_metrics(tenant_id: str) -> Dict[str, Any]:
+    snap = _load_snapshot()
+    metrics = snap.get("metrics") if isinstance(snap, dict) else {}
+    if not isinstance(metrics, dict):
+        metrics = {}
+    return {
+        "tenantId": tenant_id,
+        "cycleLatencyMs": float(metrics.get("cycleLatencyMs") or 0.0),
+        "ordersPerMinute": int(metrics.get("ordersPerMinute") or 0),
+        "errorRateByExchange": metrics.get("errorRateByExchange") or {},
+        "circuitBreakerState": metrics.get("circuitBreakerState") or {},
+        "wsState": metrics.get("wsState") or {"items": []},
+    }
+
+
+def get_go_live_checklist(tenant_id: str) -> Dict[str, Any]:
+    cfg = get_config_status()
+    metrics = get_tenant_metrics(tenant_id)
+
+    db_path = get_effective_db_path()
+    credentials_ok = False
+    risk_limits_ok = False
+    kill_switch_tested = False
+    alerts_ok = False
+
+    if os.path.exists(db_path):
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            row = conn.execute("SELECT COUNT(*) AS c FROM exchange_credentials WHERE tenant_id = ? AND status = 'ACTIVE'", (tenant_id,)).fetchone()
+            credentials_ok = int((row['c'] if row else 0) or 0) > 0
+
+            risk_row = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM config_pairs
+                WHERE COALESCE(enabled, 1) = 1
+                  AND (
+                    COALESCE(risk_percentage, 0) > 0
+                    OR COALESCE(max_percent_per_trade, 0) > 0
+                    OR COALESCE(max_absolute_per_trade, 0) > 0
+                    OR COALESCE(max_open_orders_per_symbol, 0) > 0
+                    OR COALESCE(max_exposure_per_symbol, 0) > 0
+                    OR COALESCE(max_daily_loss, 0) > 0
+                  )
+                """
+            ).fetchone()
+            risk_limits_ok = int((risk_row['c'] if risk_row else 0) or 0) > 0
+
+            ks = conn.execute(
+                "SELECT COUNT(*) AS c FROM risk_events WHERE tenant_id = ? AND rule_type = 'KILL_SWITCH'",
+                (tenant_id,),
+            ).fetchone()
+            kill_switch_tested = int((ks['c'] if ks else 0) or 0) > 0
+
+            ns = conn.execute(
+                "SELECT email_enabled, webhook_enabled FROM notification_settings WHERE tenant_id = ? LIMIT 1",
+                (tenant_id,),
+            ).fetchone()
+            alerts_ok = bool(ns and (int(ns['email_enabled'] or 0) == 1 or int(ns['webhook_enabled'] or 0) == 1))
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
+    ws_items = ((metrics.get('wsState') or {}).get('items') or [])
+    ws_ok = bool(ws_items) and all(str(r.get('state') or '').upper() in ('WS_ACTIVE', 'POLL_ACTIVE') for r in ws_items if isinstance(r, dict))
+
+    return {
+        "tenantId": tenant_id,
+        "items": [
+            {"key": "credentials_valid", "label": "Credenciais válidas", "ok": bool(credentials_ok), "link": "#/settings/exchanges"},
+            {"key": "withdraw_disabled", "label": "Withdraw desabilitado (aviso)", "ok": False, "warning": "Não verificável automaticamente por API CCXT padrão", "link": "#/settings/exchanges"},
+            {"key": "risk_limits", "label": "Risk limits configurados", "ok": bool(risk_limits_ok), "link": "#/bot-config"},
+            {"key": "kill_switch_tested", "label": "Kill switch testado", "ok": bool(kill_switch_tested), "link": "#/bot-config"},
+            {"key": "ws_or_fallback", "label": "WS ativo (ou fallback funcionando)", "ok": bool(ws_ok), "link": "#/dashboard"},
+            {"key": "alerts_configured", "label": "Alertas configurados", "ok": bool(alerts_ok), "link": "#/settings/notifications"},
+        ],
+        "workerStatus": cfg.get("worker_status"),
+    }
 def get_marketdata_orderbook_status(tenant_id: str, exchange: str = "", symbol: str = "") -> Dict[str, Any]:
     snap = _load_snapshot()
     rows = snap.get("orderbook_status") or []
