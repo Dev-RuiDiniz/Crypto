@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import logging
 import sqlite3
@@ -7,6 +6,8 @@ import time
 from datetime import datetime
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from typing import Dict, Any, List, Optional
+
+from app.pathing import ConfigResolutionError, get_work_dir, resolve_config_path
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +21,12 @@ if not logger.handlers:
 
 def _resolve_project_root() -> str:
     """
-    Resolve a raiz do projeto de forma compatível com:
-      - execução normal (python server.py / run_arbit.py)
-      - execução empacotada com PyInstaller (ARBIT_Terminal.exe)
+    Mantido por compatibilidade com paths relativos antigos.
     """
-    if getattr(sys, "frozen", False):
-        # PyInstaller: pasta onde está o .exe
-        return os.path.dirname(sys.executable)
-
-    # Execução normal: volta 2 níveis de api/handlers.py -> raiz do projeto
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return str(get_work_dir())
 
 
-# Estrutura:
-# C:\...\1ARBIT\api\handlers.py         ← este arquivo
-# C:\...\1ARBIT\config.txt              ← config do bot
-#
-# PROJECT_ROOT = C:\...\1ARBIT  (ou pasta do .exe quando empacotado)
 PROJECT_ROOT = _resolve_project_root()
-CONFIG_PATH = os.path.join(PROJECT_ROOT, "config.txt")
 _DB_PATH_OVERRIDE: Optional[str] = None
 
 
@@ -200,14 +188,24 @@ def _empty_snapshot() -> Dict[str, Any]:
 # ================== CONFIG / LOCALIZAÇÃO DO SNAPSHOT EM ARQUIVO ==================
 
 
+def _resolve_config_path() -> Optional[str]:
+    try:
+        return str(resolve_config_path("config.txt", must_exist=True).path)
+    except ConfigResolutionError as exc:
+        logger.warning("[API] config.txt não encontrado. Caminhos tentados: %s", ", ".join(str(p) for p in exc.tried_paths))
+        return None
+
+
+def _resolve_writable_config_path() -> str:
+    return str(resolve_config_path("config.txt", must_exist=False).path)
+
+
 def _load_config() -> ConfigParser:
     cfg = ConfigParser()
-    # Se não achar o arquivo, não explode – só retorna vazio
-    if os.path.exists(CONFIG_PATH):
-        logger.debug("[API] Lendo config INI em %s", CONFIG_PATH)
-        cfg.read(CONFIG_PATH, encoding="utf-8")
-    else:
-        logger.warning("[API] config.txt não encontrado em %s", CONFIG_PATH)
+    config_path = _resolve_config_path()
+    if config_path:
+        logger.debug("[API] Lendo config INI em %s", config_path)
+        cfg.read(config_path, encoding="utf-8")
     return cfg
 
 
@@ -856,11 +854,12 @@ def update_config(payload: dict):
         _set_r("ONE_CYCLE_AND_EXIT", "one_cycle_and_exit", True)
 
     # Grava INI
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+    config_path = _resolve_writable_config_path()
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
         cfg.write(f)
 
-    logger.info("[API] Configuração atualizada e gravada em %s", CONFIG_PATH)
+    logger.info("[API] Configuração atualizada e gravada em %s", config_path)
     return True, "Configuração atualizada com sucesso."
 
 
