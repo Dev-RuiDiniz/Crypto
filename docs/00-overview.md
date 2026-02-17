@@ -1,16 +1,16 @@
 # 00 - Overview
 
-Projeto de robô de trading spot multipar com:
-- Worker assíncrono (`bot.py` + `core/*`)
-- API Flask (`api/server.py`)
-- Dashboard web (`frontend/src`)
-- Persistência SQLite (`core/state_store.py`)
+O projeto implementa um robô de trading cripto multipar com backend Python, API HTTP, dashboard web e persistência em SQLite.
 
-Status geral de aderência ao briefing: **PARCIAL** (ver `../AUDITORIA_PROJETO.md`).
+## Capacidades principais
+- Execução simultânea de múltiplos pares configuráveis.
+- Estratégia de spread com ajuste percentual e manutenção/cancelamento/reinserção de ordens.
+- Estratégia de arbitragem simples entre exchanges em modo paper/live.
+- Gestão de risco centralizada (`RiskPolicy`) com bloqueios auditáveis.
+- Market data com WebSocket quando disponível e fallback automático para polling.
+- Alertas operacionais por e-mail e webhook (WhatsApp via integração externa).
 
-## Escopo funcional atual
-- Multipar por configuração.
-- Estratégia por spread com âncora local/ref.
-- Modo PAPER e LIVE.
-- Configuração operacional via API + DB com reload por `config_version`.
-- Cofre de credenciais de exchange com criptografia AES-GCM.
+## Componentes
+- Worker (`bot.py`, `core/*`, `exchanges/*`)
+- API (`api/*`)
+- Frontend (`frontend/src/*`)
