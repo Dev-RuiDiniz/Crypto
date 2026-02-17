@@ -1226,6 +1226,11 @@ class MainMonitor:
 
                 try:
                     self._reload_configs_if_needed()
+                    for ex_name in self.ex_hub.enabled_ids:
+                        try:
+                            await self.ex_hub.ensure_client_ready(ex_name)
+                        except Exception as client_exc:
+                            log.warning("[client_ready] exchange=%s error=%s", ex_name, client_exc)
                     global_cfg = self._apply_global_config()
                     if bool(global_cfg.get("kill_switch_enabled")):
                         log.warning("[global_config] kill_switch_enabled=true: ciclo sem envio de ordens.")

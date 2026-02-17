@@ -43,6 +43,20 @@ class ExchangeCredentialMetadata:
     updated_at: str
 
 
+@dataclass
+class ActiveExchangeCredential:
+    credential_id: int
+    tenant_id: str
+    exchange: str
+    label: str
+    api_key: str
+    api_secret: str
+    passphrase: Optional[str]
+    status: str
+    version: int
+    updated_at: str
+
+
 class ExchangeCredentialsService:
     def __init__(self, cfg: configparser.ConfigParser):
         self.cfg = cfg
@@ -116,6 +130,43 @@ class ExchangeCredentialsService:
                 else None
             ),
             version=int(row["version"]),
+        )
+
+    def get_active_credential(self, tenant_id: str, exchange: str) -> ActiveExchangeCredential:
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                """
+                SELECT id, tenant_id, exchange, label, api_key_encrypted, api_secret_encrypted,
+                       passphrase_encrypted, status, version, updated_at
+                FROM exchange_credentials
+                WHERE tenant_id = ? AND lower(exchange) = lower(?) AND status = 'ACTIVE'
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """,
+                (tenant_id, exchange),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        if not row:
+            raise CredentialsNotFoundError(
+                f"No active credentials found for tenant='{tenant_id}' exchange='{exchange}'"
+            )
+
+        return ActiveExchangeCredential(
+            credential_id=int(row["id"]),
+            tenant_id=str(row["tenant_id"]),
+            exchange=str(row["exchange"]),
+            label=str(row["label"]),
+            api_key=decrypt_secret(str(row["api_key_encrypted"])),
+            api_secret=decrypt_secret(str(row["api_secret_encrypted"])),
+            passphrase=(
+                decrypt_secret(str(row["passphrase_encrypted"])) if row["passphrase_encrypted"] else None
+            ),
+            status=str(row["status"]),
+            version=int(row["version"]),
+            updated_at=str(row["updated_at"]),
         )
 
     def get_credentials_by_id(self, tenant_id: str, credential_id: int) -> ExchangeCredentials:
