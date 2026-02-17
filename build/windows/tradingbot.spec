@@ -21,7 +21,7 @@ hiddenimports = [
     "api.handlers",
     "bot",
     "app.launcher",
-] + collect_submodules("core") + collect_submodules("exchanges")
+] + collect_submodules("core") + collect_submodules("exchanges") + collect_submodules("flask")
 
 block_cipher = None
 

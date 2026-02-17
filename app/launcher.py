@@ -95,8 +95,15 @@ def main() -> int:
         return 0
     if args.run_worker:
         from bot import main as worker_main
-
-        worker_main()
+        worker_argv = [sys.argv[0], "--config", args.config]
+        if args.db_path:
+            worker_argv.extend(["--db-path", str(args.db_path)])
+        original_argv = sys.argv
+        try:
+            sys.argv = worker_argv
+            worker_main()
+        finally:
+            sys.argv = original_argv
         return 0
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -124,7 +131,7 @@ def main() -> int:
     py_bin = current_python()
     if getattr(sys, "frozen", False):
         api_cmd = [py_bin, "--run-api", "--host", args.host, "--port", str(selected_port), "--db-path", str(paths.db_path)]
-        worker_cmd = [py_bin, "--run-worker", args.config, "--db-path", str(paths.db_path)]
+        worker_cmd = [py_bin, "--run-worker", "--config", args.config, "--db-path", str(paths.db_path)]
     else:
         api_cmd = [
             py_bin,
@@ -141,6 +148,7 @@ def main() -> int:
             py_bin,
             "-m",
             "bot",
+            "--config",
             args.config,
             "--db-path",
             str(paths.db_path),
