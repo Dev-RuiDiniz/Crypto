@@ -14,7 +14,12 @@ class AuditLogService:
         self.sqlite_path = self.cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db")
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.sqlite_path)
+        conn = sqlite3.connect(self.sqlite_path, timeout=30.0)
+        try:
+            conn.execute("PRAGMA busy_timeout = 30000")
+        except Exception:
+            pass
+        return conn
 
     def write_audit(
         self,

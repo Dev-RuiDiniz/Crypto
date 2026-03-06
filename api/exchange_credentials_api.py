@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import logging
 import time
 import uuid
 from typing import Any, Optional
@@ -19,11 +20,23 @@ from security.redaction import redact_value
 
 exchange_credentials_bp = Blueprint("exchange_credentials", __name__)
 
-ALLOWED_EXCHANGES = ("mexc", "binance", "bybit", "okx", "kucoin", "mercadobitcoin")
+ALLOWED_EXCHANGES = ("mexc", "gateio", "gate", "novadax", "mercadobitcoin", "binance", "bybit", "okx", "kucoin")
 ALLOWED_STATUS = {"ACTIVE", "INACTIVE", "REVOKED"}
 LABEL_ALLOWED_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ._-")
+PROBE_SYMBOLS_BY_EXCHANGE = {
+    "novadax": ("BTC/BRL", "ETH/BRL", "USDT/BRL"),
+    "mercadobitcoin": ("BTC/BRL", "ETH/BRL", "USDT/BRL"),
+    "gateio": ("BTC/USDT", "ETH/USDT"),
+    "gate": ("BTC/USDT", "ETH/USDT"),
+    "mexc": ("BTC/USDT", "ETH/USDT"),
+    "binance": ("BTC/USDT", "ETH/USDT"),
+    "bybit": ("BTC/USDT", "ETH/USDT"),
+    "okx": ("BTC/USDT", "ETH/USDT"),
+    "kucoin": ("BTC/USDT", "ETH/USDT"),
+}
 
 rate_limiter = InMemoryRateLimiter()
+log = logging.getLogger("exchange_credentials_api")
 
 
 class ValidationError(RuntimeError):
@@ -150,33 +163,230 @@ def _parse_credential_id(raw_id: str) -> int:
         raise ValidationError("Invalid id", [{"field": "id", "issue": "not_integer"}]) from exc
 
 
-def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, passphrase: Optional[str]) -> tuple[bool, int, Optional[str], Optional[str]]:
-    started = time.time()
+def _exchange_candidates(exchange: str) -> list[str]:
+    low = str(exchange or "").strip().lower()
+    if low in {"gateio", "gate"}:
+        return ["gateio", "gate"]
+    if low in {"mexc", "mexc3"}:
+        return ["mexc", "mexc3"]
+    if low == "mercadobitcoin":
+        return ["mercadobitcoin", "mercado"]
+    return [low]
+
+
+def _classify_exchange_test_error(exc: Exception) -> tuple[str, str, Optional[str]]:
+    if isinstance(exc, (ccxt.RequestTimeout, ccxt.NetworkError)):
+        return "EXCHANGE_TEST_TIMEOUT", "TIMEOUT", "check_internet_or_exchange_status"
+    if isinstance(exc, ccxt.PermissionDenied):
+        return "EXCHANGE_PERMISSION_DENIED", "PERMISSION_DENIED", "enable_trade_and_orders_permission"
+    if isinstance(exc, ccxt.AuthenticationError):
+        return "EXCHANGE_AUTH_FAILED", "AUTH_FAILED", "verify_api_key_secret_and_passphrase"
+    if isinstance(exc, ccxt.InvalidNonce):
+        return "EXCHANGE_TIMESTAMP_WINDOW", "TIMESTAMP_WINDOW", "sync_computer_clock_and_retry"
+    if isinstance(exc, ccxt.NotSupported):
+        return "EXCHANGE_TRADE_PROBE_UNAVAILABLE", "TRADE_PROBE_UNAVAILABLE", "exchange_has_no_private_probe_endpoint"
+
+    msg = str(exc).lower()
+    if any(k in msg for k in ("timeout", "timed out", "network error", "connection")):
+        return "EXCHANGE_TEST_TIMEOUT", "TIMEOUT", "check_internet_or_exchange_status"
+    if any(k in msg for k in ("recvwindow", "timestamp", "nonce", "timing")):
+        return "EXCHANGE_TIMESTAMP_WINDOW", "TIMESTAMP_WINDOW", "sync_computer_clock_and_retry"
+    if any(k in msg for k in ("no permission", "permission", "forbidden", "not allowed")):
+        return "EXCHANGE_PERMISSION_DENIED", "PERMISSION_DENIED", "enable_trade_and_orders_permission"
+    if any(k in msg for k in ("invalid api", "invalid key", "api-key", "apikey", "auth", "signature", "passphrase")):
+        return "EXCHANGE_AUTH_FAILED", "AUTH_FAILED", "verify_api_key_secret_and_passphrase"
+    if "unsupported exchange" in msg:
+        return "EXCHANGE_UNSUPPORTED", "UNSUPPORTED_EXCHANGE", None
+    if "trade_probe_unavailable" in msg:
+        return "EXCHANGE_TRADE_PROBE_UNAVAILABLE", "TRADE_PROBE_UNAVAILABLE", "exchange_has_no_private_probe_endpoint"
+    return "EXCHANGE_TEST_FAILED", "UNKNOWN", None
+
+
+def _short_error_message(exc: Exception) -> str:
+    msg = str(exc or "").replace("\n", " ").replace("\r", " ").strip()
+    if not msg:
+        return "unexpected_error"
+    if len(msg) > 240:
+        return msg[:237] + "..."
+    return msg
+
+
+def _pick_probe_symbol(exchange_low: str, markets: dict[str, Any]) -> Optional[str]:
+    if not isinstance(markets, dict) or not markets:
+        return None
+
+    preferred = PROBE_SYMBOLS_BY_EXCHANGE.get(exchange_low, ())
+    for symbol in preferred:
+        m = markets.get(symbol)
+        if isinstance(m, dict) and m.get("active", True):
+            return symbol
+
+    for symbol, meta in markets.items():
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("active", True) is False:
+            continue
+        if meta.get("spot", True) is False:
+            continue
+        upper_symbol = str(symbol or "").upper()
+        if upper_symbol.endswith("/USDT") or upper_symbol.endswith("/BRL") or upper_symbol.endswith("/USD"):
+            return str(symbol)
+
+    for symbol in markets.keys():
+        return str(symbol)
+    return None
+
+
+def _probe_private_method(client: Any, method_name: str, probe_symbol: Optional[str]) -> tuple[bool, Optional[str]]:
+    fn = getattr(client, method_name, None)
+    if not callable(fn):
+        return False, None
+
+    if probe_symbol:
+        try:
+            fn(probe_symbol)
+            return True, f"{method_name}(symbol)"
+        except ccxt.BadSymbol:
+            pass
+        except ccxt.NotSupported:
+            return False, None
+        except TypeError:
+            try:
+                fn(probe_symbol, None, 1)
+                return True, f"{method_name}(symbol,limit)"
+            except ccxt.BadSymbol:
+                pass
+            except ccxt.NotSupported:
+                return False, None
+            except TypeError:
+                pass
+            except Exception:
+                raise
+        except Exception:
+            raise
+
     try:
-        cls = getattr(ccxt, exchange)
-        client = cls(
-            {
-                "apiKey": api_key,
-                "secret": api_secret,
-                "password": passphrase,
-                "enableRateLimit": True,
-                "timeout": 8000,
-            }
-        )
+        fn()
+        return True, f"{method_name}()"
+    except ccxt.NotSupported:
+        return False, None
+    except TypeError:
+        try:
+            fn(None, None, 1)
+            return True, f"{method_name}(none,limit)"
+        except ccxt.NotSupported:
+            return False, None
+        except TypeError:
+            return False, None
+        except Exception:
+            raise
+    except Exception:
+        raise
+
+
+def _run_trade_probe(client: Any, probe_symbol: Optional[str]) -> tuple[bool, Optional[str]]:
+    for method_name in ("fetch_open_orders", "fetch_orders", "fetch_my_trades"):
+        ok, probe_method = _probe_private_method(client, method_name, probe_symbol)
+        if ok:
+            return True, probe_method
+    return False, None
+
+
+def _build_failure_message(category: Optional[str], hint: Optional[str]) -> str:
+    base_map = {
+        "AUTH_FAILED": "Credencial rejeitada pela exchange (API key/secret/passphrase invalidos).",
+        "PERMISSION_DENIED": "Credencial sem permissao para endpoints privados de ordens.",
+        "TIMESTAMP_WINDOW": "Falha de timestamp (hora local fora da janela da exchange).",
+        "TIMEOUT": "Timeout de comunicacao com a exchange durante validacao.",
+        "TRADE_PROBE_UNAVAILABLE": "Nao foi possivel validar endpoint privado de ordens nesta exchange.",
+        "UNSUPPORTED_EXCHANGE": "Exchange nao suportada para validacao automatica.",
+    }
+    msg = base_map.get(str(category or "").upper(), "Falha ao validar credencial na exchange.")
+    if hint:
+        return f"{msg} Hint: {hint}."
+    return msg
+
+
+def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, passphrase: Optional[str]) -> dict[str, Any]:
+    started = time.time()
+    client = None
+    low = str(exchange or "").strip().lower()
+    result: dict[str, Any] = {
+        "ok": False,
+        "latency_ms": 0,
+        "error_code": None,
+        "category": None,
+        "hint": None,
+        "probe_symbol": None,
+        "probe_method": None,
+        "error_message": None,
+    }
+    try:
+        candidates = _exchange_candidates(low)
+
+        for candidate in candidates:
+            if hasattr(ccxt, candidate):
+                cls = getattr(ccxt, candidate)
+                client = cls(
+                    {
+                        "apiKey": api_key,
+                        "secret": api_secret,
+                        "password": passphrase,
+                        "enableRateLimit": True,
+                        "timeout": 10_000,
+                        "options": {"defaultType": "spot", "recvWindow": 60_000},
+                    }
+                )
+                break
+
+        if client is None:
+            raise RuntimeError(f"unsupported exchange: {exchange}")
+
+        markets: dict[str, Any] = {}
+        if hasattr(client, "load_markets"):
+            loaded = client.load_markets()
+            if isinstance(loaded, dict):
+                markets = loaded
+            elif isinstance(getattr(client, "markets", None), dict):
+                markets = getattr(client, "markets")
+
+        if low in {"mexc", "mexc3"} and hasattr(client, "load_time_difference"):
+            try:
+                client.load_time_difference()
+            except Exception:
+                pass
+
         if hasattr(client, "fetch_balance"):
             client.fetch_balance()
-        else:
+        elif hasattr(client, "fetch_time"):
             client.fetch_time()
-        return True, int((time.time() - started) * 1000), None, None
+
+        probe_symbol = _pick_probe_symbol(low, markets)
+        result["probe_symbol"] = probe_symbol
+
+        trade_ready, probe_method = _run_trade_probe(client, probe_symbol)
+        result["probe_method"] = probe_method
+        if not trade_ready:
+            raise RuntimeError("trade_probe_unavailable")
+
+        result["ok"] = True
+        return result
     except Exception as exc:
-        msg = str(exc).lower()
-        if "timeout" in msg:
-            category = "TIMEOUT"
-        elif "auth" in msg or "invalid" in msg or "key" in msg:
-            category = "AUTH_FAILED"
-        else:
-            category = "UNKNOWN"
-        return False, int((time.time() - started) * 1000), "EXCHANGE_TEST_FAILED", category
+        error_code, category, hint = _classify_exchange_test_error(exc)
+        result["ok"] = False
+        result["error_code"] = error_code
+        result["category"] = category
+        result["hint"] = hint
+        result["error_message"] = _short_error_message(exc)
+        return result
+    finally:
+        result["latency_ms"] = int((time.time() - started) * 1000)
+        if client is not None:
+            try:
+                if hasattr(client, "close"):
+                    client.close()
+            except Exception:
+                pass
 
 
 @exchange_credentials_bp.route("/api/tenants/<tenantId>/exchange-credentials", methods=["GET"])
@@ -187,17 +397,51 @@ def list_credentials(tenantId: str):
     service = _service()
     items = service.list_credentials(tenantId)
     return jsonify(
-        [
-            {
-                "id": item.id,
-                "exchange": item.exchange,
-                "label": item.label,
-                "last4": item.last4,
-                "status": item.status,
-                "updatedAt": item.updated_at,
-            }
-            for item in items
-        ]
+        {
+            "items": [
+                {
+                    "id": item.id,
+                    "exchange": item.exchange,
+                    "label": item.label,
+                    "last4": item.last4,
+                    "status": item.status,
+                    "updatedAt": item.updated_at,
+                }
+                for item in items
+            ],
+            "count": len(items),
+        }
+    )
+
+
+@exchange_credentials_bp.route("/api/tenants/<tenantId>/exchanges/status", methods=["GET"])
+def list_exchange_status(tenantId: str):
+    ctx, err = _authorize(tenantId, {"ADMIN", "VIEWER"})
+    if err:
+        return err
+    service = _service()
+    items = service.list_exchange_status(tenantId)
+    return jsonify(
+        {
+            "items": [
+                {
+                    "tenantId": item.tenant_id,
+                    "exchange": item.exchange,
+                    "label": item.label,
+                    "status": item.status,
+                    "credentialId": item.credential_id,
+                    "credentialVersion": item.credential_version,
+                    "lastTestOk": item.last_test_ok,
+                    "lastTestAt": item.last_test_at,
+                    "lastTestLatencyMs": item.last_test_latency_ms,
+                    "lastErrorCode": item.last_error_code,
+                    "lastErrorCategory": item.last_error_category,
+                    "updatedAt": item.updated_at,
+                }
+                for item in items
+            ],
+            "count": len(items),
+        }
     )
 
 
@@ -315,31 +559,60 @@ def test_credentials(tenantId: str, id: str):
         service = _service()
         meta = service.get_metadata_by_id(tenantId, credential_id)
         creds = service.get_credentials_by_id(tenantId, credential_id)
-        ok, latency_ms, error_code, category = _test_exchange_connection(
+        test_result = _test_exchange_connection(
             creds.exchange,
             creds.api_key,
             creds.api_secret,
             creds.passphrase,
         )
-        service.write_test_audit(
-            tenant_id=tenantId,
-            credential_id=credential_id,
-            user_id=ctx.user_id,
-            ok=ok,
-            latency_ms=latency_ms,
-            error_code=error_code,
-            category=category,
-            exchange=meta.exchange,
-            label=meta.label,
-        )
+        ok = bool(test_result.get("ok"))
+        latency_ms = int(test_result.get("latency_ms") or 0)
+        error_code = test_result.get("error_code")
+        category = test_result.get("category")
+        try:
+            service.write_test_audit(
+                tenant_id=tenantId,
+                credential_id=credential_id,
+                user_id=ctx.user_id,
+                ok=ok,
+                latency_ms=latency_ms,
+                error_code=error_code,
+                category=category,
+                exchange=meta.exchange,
+                label=meta.label,
+            )
+        except Exception as audit_exc:
+            log.warning(
+                "write_test_audit failed tenantId=%s credentialId=%s err=%s",
+                tenantId,
+                credential_id,
+                audit_exc,
+            )
         if not ok:
-            return _error(400, "EXCHANGE_TEST_FAILED", "Connection test failed")
-        return jsonify({"ok": True, "latencyMs": latency_ms})
+            hint = str(test_result.get("hint") or "").strip()
+            details = [{"field": "exchange", "issue": str(category or "unknown").lower()}]
+            if hint:
+                details.append({"field": "action", "issue": hint})
+            return _error(
+                400,
+                "EXCHANGE_TEST_FAILED",
+                _build_failure_message(category, hint),
+                details,
+            )
+        return jsonify(
+            {
+                "ok": True,
+                "latencyMs": latency_ms,
+                "probeMethod": test_result.get("probe_method"),
+                "probeSymbol": test_result.get("probe_symbol"),
+            }
+        )
     except ValidationError as exc:
         return _error(400, "VALIDATION_ERROR", str(exc), exc.details)
     except CredentialsNotFoundError:
         return _error(404, "NOT_FOUND", "Credential not found")
     except Exception:
+        log.exception("test_credentials failed tenantId=%s credentialId=%s", tenantId, id)
         return _error(500, "INTERNAL_ERROR", "Unexpected error")
 
 

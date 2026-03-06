@@ -1,0 +1,360 @@
+MANUAL DO CLIENTE - TRADINGBOT (COMPLETO)
+Versao do sistema: 0.1.0-sprint0
+Data do manual: 2026-03-01
+Plataforma alvo: Windows
+
+=================================================================
+SUMARIO
+=================================================================
+1) O QUE E O TRADINGBOT
+2) REQUISITOS DO CLIENTE
+3) EXECUCAO LOCAL (SEM INSTALADOR)
+4) PRIMEIRO INICIO E ESTRUTURA DE ARQUIVOS
+5) COMO ABRIR E FECHAR O SISTEMA
+6) GUIA COMPLETO DAS ABAS
+7) PARES, MOEDAS E EXCHANGES (CATALOGO)
+8) MODOS PAPER E LIVE
+9) FLUXO RECOMENDADO DE PRIMEIRO USO
+10) LOGS, BANCO E ARQUIVOS IMPORTANTES
+11) BACKUP E RESTAURACAO BASICA
+12) TROUBLESHOOTING RAPIDO
+13) BOAS PRATICAS DE SEGURANCA
+14) ATUALIZACAO E DESINSTALACAO
+15) CHECKLIST PARA SUPORTE
+
+=================================================================
+1) O QUE E O TRADINGBOT
+=================================================================
+O TradingBot e uma plataforma local para operacao de estrategias
+de trading com interface web.
+
+Ele oferece:
+- operacao em modo PAPER (simulacao)
+- operacao em modo LIVE (real)
+- controle de risco e limites
+- cadastro de credenciais por exchange
+- monitoramento de ordens, saldos e status do robo
+
+O sistema roda localmente no computador do cliente e usa Python local.
+Nao e necessario Node.js para a execucao do cliente.
+
+=================================================================
+2) REQUISITOS DO CLIENTE
+=================================================================
+Requisitos minimos recomendados:
+- Windows 10 ou Windows 11 (64 bits)
+- Python 3.11+ instalado (com "Add Python to PATH")
+- 8 GB de RAM
+- 2 GB livres em disco
+- conexao de internet para uso com exchanges
+- navegador atualizado (Edge ou Chrome)
+
+Permissoes:
+- nao precisa executar como administrador para uso normal
+- antivirus deve permitir execucao do TradingBot
+
+=================================================================
+3) EXECUCAO LOCAL (SEM INSTALADOR)
+=================================================================
+1. Extraia a pasta do projeto em um local de sua preferencia.
+2. Entre na pasta principal (`Crypto-main\Crypto-main`).
+3. Execute `EXECUTAR_TRADINGBOT.bat` com duplo clique.
+
+O executor local faz automaticamente:
+- deteccao de Python 3.11+
+- criacao de ambiente virtual local (`.venv-client`)
+- instalacao de dependencias do sistema
+- inicializacao do TradingBot localmente
+
+=================================================================
+4) PRIMEIRO INICIO E ESTRUTURA DE ARQUIVOS
+=================================================================
+Na primeira execucao o sistema prepara ambiente local automaticamente:
+- cria pasta de dados em %LOCALAPPDATA%\TradingBot
+- cria banco SQLite local
+- cria pasta de logs
+- cria chave local de criptografia de credenciais
+  (%LOCALAPPDATA%\TradingBot\data\master_key.txt)
+
+Estrutura principal:
+- %LOCALAPPDATA%\TradingBot\data\state.db
+- %LOCALAPPDATA%\TradingBot\data\config.txt
+- %LOCALAPPDATA%\TradingBot\data\master_key.txt
+- %LOCALAPPDATA%\TradingBot\logs\app.log
+- %LOCALAPPDATA%\TradingBot\logs\api.log
+- %LOCALAPPDATA%\TradingBot\logs\worker.log
+
+=================================================================
+5) COMO ABRIR E FECHAR O SISTEMA
+=================================================================
+Abrir:
+- execute `EXECUTAR_TRADINGBOT.bat`
+- o painel abre automaticamente no navegador
+- endereco padrao: http://127.0.0.1:8000
+- se a porta 8000 estiver ocupada, o app seleciona porta livre
+
+Fechar:
+- no terminal do launcher, pressione Ctrl + C
+- confirme no Gerenciador de Tarefas se o processo finalizou
+
+=================================================================
+6) GUIA COMPLETO DAS ABAS
+=================================================================
+
+6.1 Centro de Controle
+Objetivo:
+- visao operacional central do sistema
+
+O que mostra:
+- status da API
+- status do Worker
+- status de escrita do banco (DB)
+- status de sincronismo de configuracao
+
+Acoes principais:
+- Atualizar status
+- Abrir logs
+- Modo PAPER / Modo LIVE
+- Ativar/Desativar kill switch
+- Salvar ajustes rapidos (loop, limites globais)
+- Pausar todos os pares / Retomar todos os pares
+
+6.2 Catalogo de Mercados (dentro do Centro de Controle)
+Objetivo:
+- listar pares, moedas e exchanges mapeados para operacao
+
+Recursos:
+- filtro por exchange
+- busca por par, moeda, simbolo local e origem
+- listagem de moedas base e moedas quote
+- botao "Adicionar no bot" para cadastrar par rapidamente
+
+Colunas tipicas:
+- Par global
+- Base
+- Quote
+- Exchanges
+- Simbolos locais
+- Fontes
+- Acao
+
+6.3 Dashboard
+Objetivo:
+- monitoramento em tempo real da operacao
+
+Indicadores comuns:
+- saldos
+- ordens pendentes, abertas e fechadas
+- mids e dados de mercado
+- status geral da operacao
+- atualizacao automatica periodica
+
+6.4 Config do Bot (DB)
+Objetivo:
+- configurar estrategia e risco por par e globalmente
+
+Ajustes comuns:
+- habilitar/desabilitar par
+- estrategia por par
+- risco percentual
+- limites de exposicao e perda diaria
+- parametros de execucao
+
+6.5 Configuracoes > Exchanges
+Objetivo:
+- cadastrar, testar e manter credenciais por exchange
+
+Funcionalidades:
+- cadastrar API key/secret
+- testar conectividade
+- revisar status das credenciais
+- rotacionar credenciais quando necessario
+
+6.6 Configuracoes > Notificacoes
+Objetivo:
+- configurar alertas operacionais
+
+Funcionalidades:
+- configurar e-mail e/ou webhook
+- testar envio de notificacao
+- ajustar canais e prioridades de alerta
+
+6.7 Configuracoes > Automacao por Par
+Objetivo:
+- definir por par a % esperada para compra e venda
+- permitir remarcacao/flutuacao automatica de ordens conforme mercado
+
+Funcionalidades:
+- cadastro de regra por par (`BUY_PCT` e `SELL_PCT`)
+- ajuste de `ANCHOR_MODE`, banda de repricing e cooldown
+- visualizacao e remocao de regras salvas
+
+6.8 Go Live
+Objetivo:
+- checklist final antes de operar em conta real (LIVE)
+
+Checklist inclui:
+- configuracao validada
+- risco revisado
+- credenciais conferidas
+- observabilidade/logs funcionando
+
+=================================================================
+7) PARES, MOEDAS E EXCHANGES (CATALOGO)
+=================================================================
+O catalogo consolida informacoes de pares e moedas que podem ser
+selecionados pelo usuario.
+
+Conceitos:
+- Par global: formato padrao (ex.: BTC/USDT)
+- Base: ativo principal do par (ex.: BTC)
+- Quote: moeda de cotacao (ex.: USDT)
+- Simbolo local: nome do par em cada exchange
+
+Fluxo recomendado para cadastrar pares:
+1. Entrar no Centro de Controle.
+2. Abrir Catalogo de Mercados.
+3. Filtrar por exchange desejada.
+4. Buscar par/moeda.
+5. Clicar em "Adicionar no bot".
+6. Ajustar risco na aba Config do Bot (DB).
+
+=================================================================
+8) MODOS PAPER E LIVE
+=================================================================
+PAPER:
+- simulacao
+- nao envia ordens reais
+- recomendado para validacao inicial e testes
+
+LIVE:
+- operacao real
+- envia ordens reais para exchange
+- usar somente apos validar tudo em PAPER
+
+Regra pratica:
+- comecar em PAPER
+- operar em LIVE apenas apos checklist de seguranca e risco
+
+=================================================================
+9) FLUXO RECOMENDADO DE PRIMEIRO USO
+=================================================================
+1. Abrir o sistema e manter em PAPER.
+2. Validar status de API/Worker/DB no Centro de Controle.
+3. Cadastrar credenciais em Configuracoes > Exchanges.
+4. Carregar e selecionar pares no Catalogo de Mercados.
+5. Ajustar risco e limites na Config do Bot (DB).
+6. Acompanhar Dashboard por alguns ciclos.
+7. Revisar logs.
+8. Executar checklist de Go Live.
+9. Somente depois considerar mudanca para LIVE.
+
+=================================================================
+10) LOGS, BANCO E ARQUIVOS IMPORTANTES
+=================================================================
+Pasta base:
+%LOCALAPPDATA%\TradingBot
+
+Arquivos:
+- data\state.db        -> banco local SQLite
+- data\config.txt      -> configuracao efetiva de runtime
+- data\master_key.txt  -> chave local do cofre de credenciais
+- logs\app.log         -> eventos do launcher
+- logs\api.log         -> eventos e erros da API
+- logs\worker.log      -> eventos e erros do worker
+
+=================================================================
+11) BACKUP E RESTAURACAO BASICA
+=================================================================
+Backup recomendado:
+- fechar o TradingBot
+- copiar pasta %LOCALAPPDATA%\TradingBot\data
+- armazenar backup em local seguro
+
+Restauracao:
+- fechar o TradingBot
+- restaurar arquivos de data para o mesmo caminho
+- abrir o app e validar status/logs
+
+Importante:
+- proteger e nao compartilhar o arquivo master_key.txt
+
+=================================================================
+12) TROUBLESHOOTING RAPIDO
+=================================================================
+Problema: painel nao abre
+- confirmar se `EXECUTAR_TRADINGBOT.bat` esta em execucao
+- testar no navegador: http://127.0.0.1:8000
+- checar logs em %LOCALAPPDATA%\TradingBot\logs
+
+Problema: API/Worker offline
+- validar status no Centro de Controle
+- revisar api.log e worker.log
+- conferir credenciais e pares ativos
+- confirmar se antivirus nao bloqueou processo
+
+Problema: credencial nao funciona
+- testar na aba Exchanges
+- o teste agora valida conexao + endpoint privado de ordens (trade-ready)
+- revisar permissao da API key (trade + leitura de ordens)
+- confirmar se nao ha restricao de IP
+- se erro for `TIMESTAMP_WINDOW`, sincronizar data/hora do Windows e testar de novo
+- se erro for `PERMISSION_DENIED`, recriar a key com permissoes corretas
+
+Problema: NovaDAX sem ordens mesmo com par configurado
+- Sintoma:
+  - par aparece no bot, mas `mids` e ordens ficam vazios (`ref=0.000000` no worker).
+- Causa comum:
+  - chave da exchange invalida ou expirada.
+  - exemplo validado em teste: `Authentication failed, Invalid accessKey`.
+- Acao:
+  - gerar nova API key/secret na NovaDAX (sem permissao de saque).
+  - atualizar em `Exchanges` e testar novamente.
+  - confirmar que o par local esta em BRL (ex.: `BTC/BRL`) para exchanges brasileiras.
+
+Problema: "Falha ao salvar bot_config: tuple indices must be integers or slices, not str"
+- Causa: leitura de versao de configuracao no SQLite assumia retorno por chave (`row[\"version\"]`) mesmo quando o driver retornava tupla.
+- Correcao aplicada em 2026-03-02:
+  - backend atualizado para leitura robusta de linhas SQLite (`Row` e `tuple`) na rotina de versionamento de config.
+  - fluxo "Adicionar no bot" voltou a salvar normalmente.
+- Validacao:
+  - endpoint `POST /api/bot-config` retornando `ok=true`.
+
+Problema: erro de permissao/antivirus
+- executar app sem modo administrador
+- adicionar excecao do executavel no antivirus
+
+=================================================================
+13) BOAS PRATICAS DE SEGURANCA
+=================================================================
+- nao habilitar permissao de saque (withdraw) em API key
+- rotacionar credenciais periodicamente
+- manter operacao inicial em PAPER
+- usar limites conservadores no inicio
+- nao compartilhar master_key.txt nem logs sensiveis
+- restringir acesso fisico ao computador operacional
+
+=================================================================
+14) ATUALIZACAO E DESINSTALACAO
+=================================================================
+Atualizacao:
+- fechar versao atual
+- substituir a pasta do projeto pela nova versao
+- executar novamente `EXECUTAR_TRADINGBOT.bat`
+- validar versao e status no painel apos update
+
+Desinstalacao:
+- excluir a pasta do projeto
+- dados em %LOCALAPPDATA%\TradingBot podem ser mantidos
+  para historico e auditoria local, salvo limpeza manual
+
+=================================================================
+15) CHECKLIST PARA SUPORTE
+=================================================================
+Ao acionar suporte, enviar:
+- horario aproximado do problema
+- descricao objetiva do que ocorreu
+- print da tela
+- arquivos de log relevantes (app.log/api.log/worker.log)
+- versao do sistema exibida no painel
+- modo de operacao no momento (PAPER ou LIVE)
