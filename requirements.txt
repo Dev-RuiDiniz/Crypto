@@ -17,3 +17,5 @@ cryptography==44.0.1
 # aiodns==3.2.0           # opcional: acelera resolução DNS para aiohttp
 # python-dotenv==1.0.1    # opcional: carregar variáveis de ambiente de um .env
 # typing-extensions==4.12.2  # só se rodar Python < 3.8 (não é seu caso)
+
+protobuf

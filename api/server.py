@@ -3,15 +3,18 @@ import argparse
 import logging
 import os
 import sys
+import mimetypes
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('application/javascript', '.mjs')
 
 from flask import Flask, jsonify, request, send_from_directory, abort, g
 
 from app.version import APP_VERSION
 from api.exchange_credentials_api import exchange_credentials_bp
 from api.notifications_api import notifications_bp
-from api.trading_config_api import trading_config_bp
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +96,13 @@ STATIC_DIR = STATIC_DIR if os.path.isdir(STATIC_DIR) else None
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static" if STATIC_DIR else None)
 app.register_blueprint(exchange_credentials_bp)
 app.register_blueprint(notifications_bp)
-app.register_blueprint(trading_config_bp)
 
 
 def _safe_send(base_dir: str, filename: str):
-    return send_from_directory(base_dir, filename)
+    res = send_from_directory(base_dir, filename)
+    if filename.endswith(".js") or filename.endswith(".mjs"):
+        res.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    return res
 
 
 
@@ -141,6 +146,7 @@ def frontend_files(filename: str):
     if not norm.startswith(os.path.normpath(FRONTEND_DIR)):
         return ("Caminho inválido.", 400)
     if os.path.isfile(full_path):
+        print(f"[DEBUG] Serving file: {filename} from {FRONTEND_DIR}")
         return _safe_send(FRONTEND_DIR, filename)
     if _index_exists():
         return _safe_send(FRONTEND_DIR, "index.html")
@@ -164,6 +170,7 @@ def add_correlation_id_header(response):
     correlation_id = getattr(g, "correlation_id", "")
     if correlation_id:
         response.headers["X-Correlation-Id"] = correlation_id
+
     return response
 
 @app.route("/api/open-logs", methods=["POST"])
@@ -300,6 +307,44 @@ def api_marketdata_orderbook_status(tenantId: str):
     exchange = request.args.get("exchange", "")
     symbol = request.args.get("symbol", "")
     return jsonify(handlers.get_marketdata_orderbook_status(tenantId, exchange=exchange, symbol=symbol))
+
+
+@app.route("/api/tenants/<tenantId>/catalog/pairs")
+def api_catalog_pairs(tenantId: str):
+    return jsonify(handlers.get_pairs_catalog(tenant_id=tenantId))
+
+
+@app.route("/api/tenants/<tenantId>/assets-pairs", methods=["GET"])
+def api_assets_pairs(tenantId: str):
+    return jsonify(handlers.get_assets_pairs(tenant_id=tenantId))
+
+
+@app.route("/api/tenants/<tenantId>/assets-pairs/assets", methods=["POST"])
+def api_upsert_asset(tenantId: str):
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    ok, msg = handlers.upsert_asset(payload, tenant_id=tenantId)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/tenants/<tenantId>/assets-pairs/assets/<asset>", methods=["DELETE"])
+def api_delete_asset(tenantId: str, asset: str):
+    ok, msg = handlers.delete_asset(asset=asset, tenant_id=tenantId)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/tenants/<tenantId>/assets-pairs/pairs", methods=["POST"])
+def api_upsert_pair_mapping(tenantId: str):
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    ok, msg = handlers.upsert_pair_mapping(payload, tenant_id=tenantId)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/tenants/<tenantId>/assets-pairs/pairs", methods=["DELETE"])
+def api_delete_pair_mapping(tenantId: str):
+    pair = request.args.get("pair", "")
+    exchange = request.args.get("exchange", "")
+    ok, msg = handlers.delete_pair_mapping(pair=pair, exchange=exchange, tenant_id=tenantId)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 
 
 @app.errorhandler(500)

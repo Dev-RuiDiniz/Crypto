@@ -27,7 +27,10 @@ components:
       type: object
       required: [exchange, label, apiKey, apiSecret]
       properties:
-        exchange: { type: string, example: mexc }
+        exchange:
+          type: string
+          enum: [gateio, gate, mexc, novadax, mercadobitcoin, binance, bybit, okx, kucoin]
+          example: gateio
         label: { type: string, example: Conta Principal }
         apiKey: { type: string }
         apiSecret: { type: string }

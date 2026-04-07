@@ -63,7 +63,9 @@ def resolve_config_path(config_value: str, must_exist: bool = True) -> ConfigRes
 def _default_config_candidates() -> List[Path]:
     candidates: List[Path] = []
     if getattr(sys, "_MEIPASS", None):
+        candidates.append(Path(str(sys._MEIPASS)) / "config.windows.local.txt")
         candidates.append(Path(str(sys._MEIPASS)) / "config.txt")
+    candidates.append(get_work_dir() / "config.windows.local.txt")
     candidates.append(get_work_dir() / "config.txt")
     return [path.resolve() for path in candidates]
 

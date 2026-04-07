@@ -94,9 +94,9 @@ No Passo 3:
 
 ## Cancelamento manual pelo usuario
 Configuracao atual:
-- `recreate_after_external_cancel = false`
+- `recreate_after_external_cancel = true`
 
-Com isso, quando o usuario cancelar uma ordem manualmente na exchange, o robo nao recria automaticamente esse lado.
+Com isso, quando o usuario cancelar uma ordem manualmente na exchange, o robo limpa o slot e recria automaticamente esse lado no proximo ciclo.
 
 ## Troubleshooting rapido
 1. Erro ao criar credencial:

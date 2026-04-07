@@ -46,6 +46,11 @@ pip install -r requirements.txt
 - O `StateStore` aplica criação/evolução de schema na inicialização.
 
 ## 4.5 Como rodar
+### Windows (1 clique, recomendado para cliente)
+```bat
+EXECUTAR_TRADINGBOT.bat
+```
+
 ### Backend + Worker (launcher)
 ```bash
 python run_arbit.py
@@ -64,13 +69,12 @@ npm run build
 ```
 
 ## 4.6 Como configurar
-- **Credenciais:** Dashboard → Configurações → Exchanges (criptografadas em repouso).
-- **Pares:** Dashboard → Trading → PAIRS (habilitar/desabilitar por exchange/symbol).
-- **Spread %:** Dashboard → Trading → SPREAD (por par).
-- **Arbitragem:** Dashboard → Trading → ARBITRAGE (por par; runtime).
-- **Risco:** Dashboard → Trading → RISK (global e por par).
-- **Alertas:** Dashboard → Configurações → Notificações (por tenant).
-- Alterações são persistidas em DB, auditadas e aplicadas em runtime no próximo ciclo do worker.
+- **Credenciais**: via API/dashboard de credenciais (criptografadas em repouso).
+- **Pares**: seção `[PAIRS]` e painel de configuração.
+- **Spread %**: seção `[SPREAD]` por par.
+- **Arbitragem**: habilitação por par/configuração runtime.
+- **Risco**: limites globais e por par em `RiskPolicy`.
+- **Alertas**: canais e severidade por tenant.
 
 ## 4.7 Como usar
 1. Adicionar credenciais de exchange.
@@ -115,3 +119,5 @@ npm run build
 - `docs/10-troubleshooting.md`
 - `docs/11-paper-vs-live.md`
 - `docs/production-runbook.md`
+- `docs/12-auditoria-2026-03-01.md`
+- `docs/13-windows-local-setup.md`

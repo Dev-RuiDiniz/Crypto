@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import hashlib
 import time
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any, Set
 import configparser
 
 try:
@@ -13,7 +13,7 @@ except Exception:
     def get_logger(name: str): return logging.getLogger(name)
     def get_user_logger(name: str): return logging.getLogger(name)
 
-log = get_logger("router")          # técnico -> arquivo detalhado
+log = get_logger("router")          # tÃ©cnico -> arquivo detalhado
 ulog = get_user_logger("router")    # humano -> console (opcional)
 
 from exchanges.adapters import Adapters, ceil_step
@@ -22,16 +22,16 @@ from core.risk_policy import RiskPolicy
 
 class OrderRouter:
     """
-    Modo novo (padrão): ANCHOR_MODE=LOCAL
+    Modo novo (padrÃ£o): ANCHOR_MODE=LOCAL
     - Para CADA exchange habilitada:
-      * BUY: ancora no best ask LOCAL e lança ordem limit em ask * (1 - buy_spread)
-      * SELL: ancora no best bid LOCAL e lança ordem limit em bid * (1 + sell_spread)
-    - Manutenção por exchange/lado (banda em bps + cooldown)
-    - Pós-fill: abre automaticamente o lado oposto na MESMA exchange (se configurado)
-    - Alerta de reabastecimento **após fills**
+      * BUY: ancora no best ask LOCAL e lanÃ§a ordem limit em ask * (1 - buy_spread)
+      * SELL: ancora no best bid LOCAL e lanÃ§a ordem limit em bid * (1 + sell_spread)
+    - ManutenÃ§Ã£o por exchange/lado (banda em bps + cooldown)
+    - PÃ³s-fill: abre automaticamente o lado oposto na MESMA exchange (se configurado)
+    - Alerta de reabastecimento **apÃ³s fills**
 
     Compat legacy (ANCHOR_MODE=REF):
-    - Mantém roteamento por alvos em USDT (modo antigo)
+    - MantÃ©m roteamento por alvos em USDT (modo antigo)
     """
 
     def __init__(self, cfg: configparser.ConfigParser, ex_hub, portfolio, risk, state, risk_policy=None):
@@ -56,10 +56,10 @@ class OrderRouter:
         self.cooldown_sec = float(self.cfg.get("ROUTER", "REPRICE_COOLDOWN_SEC", fallback="0"))
         self.one_cycle_exit = self.cfg.getboolean("ROUTER", "ONE_CYCLE_AND_EXIT", fallback=False)
 
-        # “grudar na exchange” (compat legado)
+        # â€œgrudar na exchangeâ€ (compat legado)
         self.sticky_per_side = self.cfg.getboolean("ROUTER", "STICKY_PER_SIDE", fallback=True)
 
-        # Logs de “skip por saldo” somente no arquivo detalhado (console não recebe)
+        # Logs de â€œskip por saldoâ€ somente no arquivo detalhado (console nÃ£o recebe)
         self.verbose_skips = self.cfg.getboolean("LOG", "VERBOSE_SKIPS", fallback=False)
 
         # Eventos no console e sink opcional para painel
@@ -71,8 +71,13 @@ class OrderRouter:
         self.alert_cooldown_sec = float(self.cfg.get("ROUTER", "ALERT_COOLDOWN_SEC", fallback="120"))
         self.auto_post_fill_opposite = self.cfg.getboolean("ROUTER", "AUTO_POST_FILL_OPPOSITE", fallback=True)
         self.post_fill_use_filled_qty = self.cfg.getboolean("ROUTER", "POST_FILL_USE_FILLED_QTY", fallback=True)
+        self.recreate_after_external_cancel = self.cfg.getboolean(
+            "ROUTER",
+            "RECREATE_AFTER_EXTERNAL_CANCEL",
+            fallback=True,
+        )
 
-        # Deduplicação de eventos (reduzir flood visual)
+        # DeduplicaÃ§Ã£o de eventos (reduzir flood visual)
         self.event_dedup_sec = float(self.cfg.get("LOG", "EVENT_DEDUP_SEC", fallback="90"))
         self._event_last_ts: Dict[str, float] = {}
 
@@ -84,22 +89,24 @@ class OrderRouter:
         # Estrutura: orders[pair][ex_name][side] = {...}
         self.orders: Dict[str, Dict[str, Dict[str, Dict[str, Any]]]] = {}
 
-        # Cooldown para alertas de reabastecimento (após fill)
+        # Cooldown para alertas de reabastecimento (apÃ³s fill)
         self._alert_last_ts: Dict[Tuple[str, str, str], float] = {}
 
         self._should_exit = False
         self._recent_order_hashes: Dict[str, float] = {}
         self._order_hash_ttl_sec = float(self.cfg.get("ROUTER", "ORDER_HASH_TTL_SEC", fallback="8"))
+        self._expected_cancel_oids: Set[str] = set()
+        self._manual_cancel_blocks: Dict[Tuple[str, str, str], float] = {}
 
 
-    # ------------------------- eventos / integração com painel -------------------------
+    # ------------------------- eventos / integraÃ§Ã£o com painel -------------------------
 
     def set_event_sink(self, sink):
         """Define um callback opcional para receber eventos humanos (painel)."""
         self._event_sink = sink
 
     def _emit_event(self, msg: str, level: str = "info"):
-        """Envia evento para painel (se houver) ou console (se habilitado), com deduplicação por tempo."""
+        """Envia evento para painel (se houver) ou console (se habilitado), com deduplicaÃ§Ã£o por tempo."""
         try:
             now = time.time()
             last = self._event_last_ts.get(msg, 0.0)
@@ -143,7 +150,7 @@ class OrderRouter:
 
     def _pair_spreads(self, pair: str) -> Tuple[float, float]:
         """
-        Retorna (buy_spread, sell_spread) como frações.
+        Retorna (buy_spread, sell_spread) como fraÃ§Ãµes.
         Prioridade:
           1) [SPREAD] <PAIR>_BUY_PCT / <PAIR>_SELL_PCT
           2) [SPREAD] <PAIR>
@@ -174,6 +181,22 @@ class OrderRouter:
 
         return 0.10, 0.10  # fallback final
 
+    async def _best_from_poll_usdt(self, ex_name: str, symbol_local: str, side: str) -> Optional[float]:
+        try:
+            if hasattr(self.ex_hub, "raw_fetch_orderbook"):
+                ob = await self.ex_hub.raw_fetch_orderbook(ex_name, symbol_local, limit=1)
+            else:
+                ob = await self.ex_hub.get_orderbook(ex_name, symbol_local, limit=1)
+            if not isinstance(ob, dict):
+                return None
+            levels = ob.get("asks") if str(side).lower() == "ask" else ob.get("bids")
+            if levels:
+                px_local = float(levels[0][0])
+                return self.ex_hub.to_usdt(ex_name, symbol_local, px_local)
+        except Exception as e:
+            log.warning(f"[{ex_name}] poll fallback {side} falhou em {symbol_local}: {e}")
+        return None
+
     async def _best_ask_usdt(self, ex_name: str, symbol_local: str) -> Optional[float]:
         try:
             if hasattr(self.ex_hub, "get_orderbook_meta"):
@@ -183,6 +206,18 @@ class OrderRouter:
                 meta = {"snapshot": ob, "ageMs": 0, "source": "POLL", "state": "DEGRADED"}
             age_ms = int(meta.get("ageMs") or 0)
             if age_ms > int(self.marketdata_stale_ms):
+                ask_fallback = await self._best_from_poll_usdt(ex_name, symbol_local, "ask")
+                if ask_fallback and ask_fallback > 0:
+                    log.info(
+                        "MARKETDATA_STALE_FALLBACK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
+                        getattr(self.ex_hub, "tenant_id", "default"),
+                        ex_name,
+                        symbol_local,
+                        age_ms,
+                        meta.get("source"),
+                        meta.get("state"),
+                    )
+                    return float(ask_fallback)
                 log.warning(
                     "MARKETDATA_STALE_BLOCK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
                     getattr(self.ex_hub, "tenant_id", "default"),
@@ -210,6 +245,18 @@ class OrderRouter:
                 meta = {"snapshot": ob, "ageMs": 0, "source": "POLL", "state": "DEGRADED"}
             age_ms = int(meta.get("ageMs") or 0)
             if age_ms > int(self.marketdata_stale_ms):
+                bid_fallback = await self._best_from_poll_usdt(ex_name, symbol_local, "bid")
+                if bid_fallback and bid_fallback > 0:
+                    log.info(
+                        "MARKETDATA_STALE_FALLBACK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
+                        getattr(self.ex_hub, "tenant_id", "default"),
+                        ex_name,
+                        symbol_local,
+                        age_ms,
+                        meta.get("source"),
+                        meta.get("state"),
+                    )
+                    return float(bid_fallback)
                 log.warning(
                     "MARKETDATA_STALE_BLOCK tenantId=%s exchange=%s symbol=%s ageMs=%s source=%s state=%s",
                     getattr(self.ex_hub, "tenant_id", "default"),
@@ -284,6 +331,35 @@ class OrderRouter:
         self.orders.setdefault(pair, {})
         self.orders[pair].setdefault(ex_name, {})
 
+    @staticmethod
+    def _manual_block_key(pair: str, ex_name: str, side: str) -> Tuple[str, str, str]:
+        return (str(pair).upper(), str(ex_name).lower(), str(side).lower())
+
+    def _is_manual_cancel_blocked(self, pair: str, ex_name: str, side: str) -> bool:
+        if self.recreate_after_external_cancel:
+            return False
+        return self._manual_block_key(pair, ex_name, side) in self._manual_cancel_blocks
+
+    def _clear_manual_cancel_block(self, pair: str, ex_name: str, side: str) -> None:
+        key = self._manual_block_key(pair, ex_name, side)
+        self._manual_cancel_blocks.pop(key, None)
+
+    def _block_side_after_manual_cancel(self, pair: str, ex_name: str, side: str, oid: str, reason: str) -> None:
+        key = self._manual_block_key(pair, ex_name, side)
+        self._manual_cancel_blocks[key] = time.time()
+        self._emit_event(
+            f"[{pair}] {ex_name} {str(side).upper()} cancelada manualmente; nao sera recriada automaticamente.",
+            level="warn",
+        )
+        log.info(
+            "[%s] %s %s cancelada manualmente (%s, oid=%s). Recriacao automatica bloqueada para esse lado.",
+            pair,
+            ex_name,
+            str(side).upper(),
+            reason,
+            oid,
+        )
+
     def _alert_need_balance(self, ex_name: str, symbol_local: str, asset: str, reason: str):
         key = (ex_name, symbol_local, asset.upper())
         now = time.time()
@@ -291,10 +367,10 @@ class OrderRouter:
         if now - last < self.alert_cooldown_sec:
             return
         self._alert_last_ts[key] = now
-        self._emit_event(f"[ABASTECER] {ex_name} {symbol_local}: reabastecer {asset.upper()} — {reason}.", level="warn")
-        log.info(f"[ALERTA] {ex_name} {symbol_local}: reabastecer {asset.upper()} — {reason}.")
+        self._emit_event(f"[ABASTECER] {ex_name} {symbol_local}: reabastecer {asset.upper()} â€” {reason}.", level="warn")
+        log.info(f"[ALERTA] {ex_name} {symbol_local}: reabastecer {asset.upper()} â€” {reason}.")
 
-    # --------- checagem de capacidade por saldo + mínimos ----------
+    # --------- checagem de capacidade por saldo + mÃ­nimos ----------
 
     async def _has_buy_capacity(self, ex_name: str, symbol_local: str, price_usdt: float) -> Tuple[bool, str]:
         ex = self.ex_hub.exchanges.get(ex_name)
@@ -350,7 +426,7 @@ class OrderRouter:
             f"| mins: qty>={min_qty} notional>={min_notional}"
         )
 
-    # ------------------------- cálculo de quantidade (stake) -------------------------
+    # ------------------------- cÃ¡lculo de quantidade (stake) -------------------------
 
     async def _calc_amount(
         self,
@@ -377,26 +453,46 @@ class OrderRouter:
 
         if mode == "FIXO_USDT":
             notional_usdt = max(0.0, float(value))
-            # bot_config.risk_percentage: limite adicional por operação.
+            # bot_config.risk_percentage: limite adicional por operaÃ§Ã£o.
             risk_frac = max(0.0, min(1.0, float(risk_percentage) / 100.0)) if risk_percentage > 0 else 0.0
             if side_l == "buy":
                 q_free = await self._quote_free(ex, quote, ex_name=ex_name)
                 q_usdt = (float(q_free) / float(self.ex_hub.usdt_brl)) if quote == "BRL" else float(q_free)
                 balance_used_usdt = float(q_usdt)
+                if notional_usdt <= 0.0 and risk_frac > 0.0:
+                    # Fallback seguro: quando stake FIXO_USDT nao foi configurado para o par,
+                    # usa o risco percentual sobre o saldo disponivel.
+                    notional_usdt = float(q_usdt) * float(risk_frac)
+                    log.info(
+                        "[position_sizing] pair=%s ex=%s side=%s stake_fallback=risk_balance_pct pct=%.4f",
+                        pair,
+                        ex_name,
+                        side_l,
+                        float(risk_frac),
+                    )
                 notional_usdt = min(notional_usdt, q_usdt)
-                if risk_frac > 0:
+                if risk_frac > 0 and float(value) > 0:
                     notional_usdt = min(notional_usdt, q_usdt * risk_frac)
                 if max_daily_loss > 0:
                     notional_usdt = min(notional_usdt, float(max_daily_loss))
                 if price_usdt > 0:
                     amount = notional_usdt / price_usdt
             else:
-                if price_usdt > 0:
-                    amount = notional_usdt / price_usdt
                 b_free = await self._base_free(ex, base, ex_name=ex_name)
                 balance_used_usdt = float(b_free) * float(price_usdt)
-                amount = min(amount, float(b_free))
-                if risk_frac > 0:
+                if notional_usdt <= 0.0 and risk_frac > 0.0:
+                    amount = float(b_free) * float(risk_frac)
+                    log.info(
+                        "[position_sizing] pair=%s ex=%s side=%s stake_fallback=risk_base_pct pct=%.4f",
+                        pair,
+                        ex_name,
+                        side_l,
+                        float(risk_frac),
+                    )
+                elif price_usdt > 0:
+                    amount = notional_usdt / price_usdt
+                amount = min(float(amount), float(b_free))
+                if risk_frac > 0 and float(value) > 0:
                     amount = min(amount, float(b_free) * risk_frac)
         else:
             pct = max(0.0, min(1.0, float(value)))
@@ -471,7 +567,7 @@ class OrderRouter:
         except Exception:
             pass
 
-    # ------------------------- núcleo: reprecificação por exchange -------------------------
+    # ------------------------- nÃºcleo: reprecificaÃ§Ã£o por exchange -------------------------
 
     def _band_hit(self, pair: str, ex_name: str, side: str, new_price_local: float) -> bool:
         if self.track_bps <= 0:
@@ -491,7 +587,7 @@ class OrderRouter:
                 return False
         return True
 
-    # --------- helpers p/ normalização de símbolo ao filtrar ---------
+    # --------- helpers p/ normalizaÃ§Ã£o de sÃ­mbolo ao filtrar ---------
     @staticmethod
     def _same_symbol(sym_from_order: str, symbol_local: str) -> bool:
         s = (sym_from_order or "").strip().upper()
@@ -519,7 +615,7 @@ class OrderRouter:
 
     async def _cancel_side(self, pair: str, ex_name: str, symbol_local: str, side: str):
         """
-        Cancela ordens abertas do lado informado para simplificar a reprecificação.
+        Cancela ordens abertas do lado informado para simplificar a reprecificaÃ§Ã£o.
         Usa ExchangeHub.cancel_order (compat MB v4) e passa o par global.
         """
         side_l = str(side).lower()
@@ -542,13 +638,14 @@ class OrderRouter:
         for oid in targets:
             try:
                 await self.ex_hub.cancel_order(ex_name, oid, global_pair=pair, side_hint=side_l)
+                self._expected_cancel_oids.add(str(oid))
                 cancelled += 1
                 await asyncio.sleep(0.10)
             except Exception as e:
                 errors += 1
                 log.warning(f"[cancel_side] {ex_name} {symbol_local} {side_l} falhou ao cancelar {oid}: {e}")
 
-        # verificação rápida
+        # verificaÃ§Ã£o rÃ¡pida
         for _ in range(1):
             remaining = []
             opens2 = await self._fetch_open_orders_safe(ex_name, symbol_local)
@@ -565,6 +662,7 @@ class OrderRouter:
             for oid in remaining:
                 try:
                     await self.ex_hub.cancel_order(ex_name, oid, global_pair=pair, side_hint=side_l)
+                    self._expected_cancel_oids.add(str(oid))
                     cancelled += 1
                     await asyncio.sleep(0.15)
                 except Exception as e:
@@ -576,8 +674,8 @@ class OrderRouter:
 
     async def _dedupe_side(self, pair: str, ex_name: str, symbol_local: str, side: str, keep_oid: str):
         """
-        Garante no máximo 1 ordem por exchange/símbolo/lado.
-        Cancela quaisquer outras abertas que não sejam keep_oid (via HUB).
+        Garante no mÃ¡ximo 1 ordem por exchange/sÃ­mbolo/lado.
+        Cancela quaisquer outras abertas que nÃ£o sejam keep_oid (via HUB).
         """
         side_l = str(side).lower()
         opens = await self._fetch_open_orders_safe(ex_name, symbol_local)
@@ -599,6 +697,7 @@ class OrderRouter:
         for oid in victims:
             try:
                 await self.ex_hub.cancel_order(ex_name, oid, global_pair=pair, side_hint=side_l)
+                self._expected_cancel_oids.add(str(oid))
                 killed += 1
                 await asyncio.sleep(0.10)
             except Exception as e:
@@ -679,7 +778,7 @@ class OrderRouter:
                     continue
 
             if not victims:
-                log.info(f"[boot] {ex_name}: nenhum cancelamento necessário.")
+                log.info(f"[boot] {ex_name}: nenhum cancelamento necessÃ¡rio.")
                 continue
 
             cancelled, errors = 0, 0
@@ -692,7 +791,7 @@ class OrderRouter:
                     errors += 1
                     log.warning(f"[boot] {ex_name} cancel {oid}@{sym} erro: {e}")
 
-            # verificação pós-cancelamento
+            # verificaÃ§Ã£o pÃ³s-cancelamento
             still = 0
             try:
                 opens2 = await self.ex_hub.fetch_open_orders(ex_name, global_pair=None)
@@ -708,9 +807,9 @@ class OrderRouter:
                     continue
 
             log.info(f"[boot] {ex_name}: canceladas={cancelled} erros={errors} restantes={still}")
-            self._emit_event(f"Boot: {ex_name} — ordens canceladas={cancelled}, erros={errors}, restantes={still}.")
+            self._emit_event(f"Boot: {ex_name} â€” ordens canceladas={cancelled}, erros={errors}, restantes={still}.")
 
-    # ------------------------- criação de ordem (com fallback) -------------------------
+    # ------------------------- criaÃ§Ã£o de ordem (com fallback) -------------------------
 
     def _mb_has_legacy_keys(self) -> bool:
         sect = "EXCHANGES.mercadobitcoin"
@@ -743,6 +842,14 @@ class OrderRouter:
         self._recent_order_hashes[key] = now
         return False
 
+    @staticmethod
+    def _looks_paper_order_id(oid: Any) -> bool:
+        txt = str(oid or "").strip().lower()
+        return txt.startswith("paper_") or txt.startswith("pending::")
+
+    def _is_paper_mode(self) -> bool:
+        return str(getattr(self.ex_hub, "mode", "") or "").strip().upper() == "PAPER"
+
     async def _create_limit_order_safe(
         self,
         ex_name: str,
@@ -755,7 +862,7 @@ class OrderRouter:
         cycle_id: str,
     ) -> Dict[str, Any]:
         """
-        Tenta via ExchangeHub.create_limit_order (preço em USDT).
+        Tenta via ExchangeHub.create_limit_order (preÃ§o em USDT).
         Para MercadoBitcoin: usa MB v4 adapter corrigido via Exchange Hub.
         """
         # 1) SEMPRE tentar via hub primeiro (MB v4 e afins) - CORRIGIDO
@@ -786,6 +893,13 @@ class OrderRouter:
                     "client_order_id": client_order_id,
                 })
                 if not decision.allowed:
+                    self.state.mark_order_failed(
+                        tenant_id=str(getattr(self.ex_hub, "tenant_id", "default")),
+                        exchange=ex_name,
+                        client_order_id=client_order_id,
+                        error_code=str(decision.rule_type or "RISK_BLOCKED"),
+                        retryable=True,
+                    )
                     log.warning(f"[{pair}] blocked by RiskPolicy ex={ex_name} side={side_l} rule={decision.rule_type} reason={decision.reason}")
                     return {"id": "", "status": "blocked", "clientOrderId": client_order_id, "error": decision.reason, "rule_type": decision.rule_type}
                 if not bool(state_row.get("should_submit", True)):
@@ -838,28 +952,43 @@ class OrderRouter:
         except Exception as e:
             msg = str(e)
             log.info(f"[{pair}] {ex_name} hub.create_limit_order falhou: {msg}")
+
+            if self._is_paper_mode():
+                log.warning(
+                    f"[{pair}] {ex_name} modo PAPER: fallback CCXT real desabilitado para evitar ordens reais por engano."
+                )
+                return {
+                    "id": f"paper_{ex_name}_{pair}_{side_l}_{int(time.time() * 1000)}",
+                    "symbol": symbol_local,
+                    "type": "limit",
+                    "side": side_l,
+                    "amount": float(qty_local),
+                    "price": float(price_local),
+                    "status": "open",
+                    "info": {"paper": True, "fallback": True},
+                }
             
-            # Para MB, verificar se temos fallback CCXT disponível
+            # Para MB, verificar se temos fallback CCXT disponÃ­vel
             if ex_name.lower() == "mercadobitcoin":
                 if not self._mb_has_legacy_keys():
-                    log.info("[MB] Sem API_KEY/SECRET legados no config — sem fallback CCXT.")
+                    log.info("[MB] Sem API_KEY/SECRET legados no config â€” sem fallback CCXT.")
                     return {}
                 # Se tem chaves legadas, tenta CCXT
                 log.info("[MB] Tentando fallback CCXT com chaves legadas...")
 
-        # 2) fallback para create_order nativo (ccxt/adapter), com preço local
-        # Só tenta se for MB com chaves legadas ou outra exchange
+        # 2) fallback para create_order nativo (ccxt/adapter), com preÃ§o local
+        # SÃ³ tenta se for MB com chaves legadas ou outra exchange
         if ex_name.lower() != "mercadobitcoin" or self._mb_has_legacy_keys():
             ex = self.ex_hub.exchanges.get(ex_name)
             if ex:
                 try:
                     return await ex.create_order(symbol_local, "limit", side_l, float(qty_local), float(price_local))
                 except Exception as e:
-                    log.warning(f"[{pair}] {ex_name} fallback CCXT também falhou: {e}")
+                    log.warning(f"[{pair}] {ex_name} fallback CCXT tambÃ©m falhou: {e}")
 
         return {}  # retorna vazio se tudo falhou
 
-    # ------------------------- reprecificação -------------------------
+    # ------------------------- reprecificaÃ§Ã£o -------------------------
 
     async def _reprice_one(
         self,
@@ -877,25 +1006,27 @@ class OrderRouter:
     ):
         ex = self.ex_hub.exchanges.get(ex_name)
         if not ex:
-            log.warning(f"[{pair}] {str(side).upper()} {ex_name}: exchange não instanciada.")
+            log.warning(f"[{pair}] {str(side).upper()} {ex_name}: exchange nÃ£o instanciada.")
             return
 
         side_l = str(side).lower()
         side_u = side_l.upper()
+        if self._is_manual_cancel_blocked(pair, ex_name, side_l):
+            return
 
         price_local = self._usdt_to_local_price(ex_name, symbol_local, price_usdt)
         price_local = self.adapters.round_price(ex_name, symbol_local, price_local)
 
-        # CORREÇÃO CRÍTICA: Para Mercado Bitcoin, garantir arredondamento para 2 casas decimais
+        # CORREÃ‡ÃƒO CRÃTICA: Para Mercado Bitcoin, garantir arredondamento para 2 casas decimais
         if ex_name.lower() == "mercadobitcoin":
             price_local_antes = price_local
             price_local = round(price_local, 2)
-            log.info(f"[{pair}] {ex_name} preço arredondado para step 0.01: {price_local_antes} -> {price_local}")
+            log.info(f"[{pair}] {ex_name} preÃ§o arredondado para step 0.01: {price_local_antes} -> {price_local}")
 
         if not self._band_hit(pair, ex_name, side_l, price_local):
             rec = self.orders.get(pair, {}).get(ex_name, {}).get(side_l)
             if rec:
-                log.info(f"[{pair}] {ex_name} {side_u} mantendo ordem (Δ<{self.track_bps}bps): "
+                log.info(f"[{pair}] {ex_name} {side_u} mantendo ordem (Î”<{self.track_bps}bps): "
                          f"oid={rec.get('oid','?')} price_local={rec.get('price_local')}")
             return
 
@@ -920,7 +1051,7 @@ class OrderRouter:
             router_min_notional_usdt=float(min_notional_usdt or self.min_router_notional),
         )
         if not ok or amount_grown <= 0:
-            log.info(f"[{pair}] {ex_name} {side_u} {symbol_local} bloqueado por mínimos: {reason} "
+            log.info(f"[{pair}] {ex_name} {side_u} {symbol_local} bloqueado por mÃ­nimos: {reason} "
                      f"(amount_calc={amount_raw} @ {price_usdt} USDT)")
             return
 
@@ -974,9 +1105,9 @@ class OrderRouter:
                 cycle_id=str(cycle_id or ""),
             )
 
-            # Robustez: só segue se veio um dict com id
+            # Robustez: sÃ³ segue se veio um dict com id
             if not isinstance(order, dict) or not (order.get("id") or order.get("orderId")):
-                log.info(f"[{pair}] {ex_name} {side_u} {symbol_local}: create_order não retornou id — nada foi registrado.")
+                log.info(f"[{pair}] {ex_name} {side_u} {symbol_local}: create_order nÃ£o retornou id â€” nada foi registrado.")
                 return
 
             oid = order.get("id") or order.get("orderId") or "?"
@@ -1032,7 +1163,7 @@ class OrderRouter:
         except Exception as e:
             log.warning(f"[{pair}] {ex_name} {symbol_local} {side_l} create_order falhou: {e}")
 
-    # -------- checagem de mínimos sem crescer --------
+    # -------- checagem de mÃ­nimos sem crescer --------
 
     def _meets_minima_no_grow(
         self,
@@ -1059,7 +1190,7 @@ class OrderRouter:
 
         return True, ""
 
-    # ------------------------- API pública -------------------------
+    # ------------------------- API pÃºblica -------------------------
 
     async def _reprice_side_local(
         self,
@@ -1165,7 +1296,7 @@ class OrderRouter:
         if not buy_pick:
             buy_pick = await self._pick_by_mids("buy", pair, buy_target_usdt)
             if buy_pick:
-                log.info(f"[{pair}] BUY fallback via mids -> {buy_pick[0]} {buy_pick[1]} mid≈{buy_pick[2]:.6f}")
+                log.info(f"[{pair}] BUY fallback via mids -> {buy_pick[0]} {buy_pick[1]} midâ‰ˆ{buy_pick[2]:.6f}")
         if buy_pick:
             ex_name, symbol_local, _best_ask = buy_pick
             await self._reprice_one(
@@ -1183,7 +1314,7 @@ class OrderRouter:
         if not sell_pick:
             sell_pick = await self._pick_by_mids("sell", pair, sell_target_usdt)
             if sell_pick:
-                log.info(f"[{pair}] SELL fallback via mids -> {sell_pick[0]} {sell_pick[1]} mid≈{sell_pick[2]:.6f}")
+                log.info(f"[{pair}] SELL fallback via mids -> {sell_pick[0]} {sell_pick[1]} midâ‰ˆ{sell_pick[2]:.6f}")
         if sell_pick:
             ex_name, symbol_local, _best_bid = sell_pick
             await self._reprice_one(
@@ -1274,7 +1405,7 @@ class OrderRouter:
             return min(cand, key=lambda x: x[2])
         return max(cand, key=lambda x: x[2])
 
-    # ------------------------- pós-fill: abrir lado oposto -------------------------
+    # ------------------------- pÃ³s-fill: abrir lado oposto -------------------------
 
     async def _open_opposite_after_fill(self, pair: str, ex_name: str, symbol_local: str, side_filled: str, qty_filled: float):
         if not self.auto_post_fill_opposite:
@@ -1314,19 +1445,51 @@ class OrderRouter:
     async def _fetch_order_safe(self, ex_name: str, oid: str, symbol_local: str) -> Optional[Dict[str, Any]]:
         """
         Busca a ordem de forma resiliente usando Exchange Hub corrigido:
-          - Usa ex_hub.fetch_order che já suporta MB v4
-          - Fallback para CCXT se necessário
+          - Usa ex_hub.fetch_order che jÃ¡ suporta MB v4
+          - Fallback para CCXT se necessÃ¡rio
         """
+        not_found_tokens = (
+            "not found",
+            "order not found",
+            "unknown order",
+            "does not exist",
+            "doesn't exist",
+            "invalid order",
+            "invalid orderid",
+            "invalid order id",
+            "order_not_found",
+            "order_not_exist",
+            "order does not exist",
+            "record not found",
+            "no such order",
+            "not_exist",
+            "ordem nÃ£o encontrada",
+            "ordem nao encontrada",
+        )
+        paper_mode = self._is_paper_mode()
+        paper_oid = self._looks_paper_order_id(oid)
+
         try:
-            # Usa o método fetch_order do Exchange Hub (CORRIGIDO)
-            if hasattr(self.ex_hub, "fetch_order"):
-                return await self.ex_hub.fetch_order(
+            # Usa o mÃ©todo fetch_order do Exchange Hub (CORRIGIDO)
+            if hasattr(self.ex_hub, "fetch_order") and (not paper_mode or paper_oid):
+                hub_resp = await self.ex_hub.fetch_order(
                     ex_name=ex_name,
                     order_id=oid,
                     global_pair=symbol_local,  # usa symbol_local como global_pair
                     side_hint=None
                 )
+                if isinstance(hub_resp, dict):
+                    info = hub_resp.get("info") or {}
+                    is_paper_info = bool(isinstance(info, dict) and info.get("paper"))
+                    if paper_mode and is_paper_info and (not paper_oid):
+                        # Em modo PAPER + oid real, ignorar resposta simulada e consultar exchange real.
+                        pass
+                    else:
+                        return hub_resp
         except Exception as e:
+            msg = str(e or "").lower()
+            if any(token in msg for token in not_found_tokens):
+                return {"status": "canceled", "id": oid, "symbol": symbol_local}
             log.warning(f"[fills] ex_hub.fetch_order falhou ({ex_name} {oid}): {e}")
 
         # Fallback para CCXT direto
@@ -1335,7 +1498,10 @@ class OrderRouter:
             if ex:
                 return await ex.fetch_order(oid, symbol_local)
         except Exception as e:
-            log.warning(f"[fills] CCXT fetch_order também falhou ({ex_name} {oid}): {e}")
+            msg = str(e or "").lower()
+            if any(token in msg for token in not_found_tokens):
+                return {"status": "canceled", "id": oid, "symbol": symbol_local}
+            log.warning(f"[fills] CCXT fetch_order tambÃ©m falhou ({ex_name} {oid}): {e}")
 
         return None
 
@@ -1351,24 +1517,228 @@ class OrderRouter:
                 continue
         return float(default)
 
+    @staticmethod
+    def _slot_cleanup(orders_map: Dict[str, Dict[str, Dict[str, Dict[str, Any]]]], pair: str, ex_name: str, side: str) -> None:
+        try:
+            orders_map.get(pair, {}).get(ex_name, {}).pop(side, None)
+            if not orders_map.get(pair, {}).get(ex_name, {}):
+                orders_map.get(pair, {}).pop(ex_name, None)
+            if not orders_map.get(pair, {}):
+                orders_map.pop(pair, None)
+        except Exception:
+            pass
+
+    async def _open_order_ids_for_symbol(self, ex_name: str, symbol_local: str, force_exchange_query: bool = False) -> Optional[set]:
+        """
+        Retorna IDs de ordens abertas para exchange/sÃ­mbolo.
+        Se a consulta falhar, retorna None (nÃ£o inferir cancelamento nesse caso).
+        """
+        try:
+            if force_exchange_query:
+                ex = self.ex_hub.exchanges.get(ex_name)
+                if not ex:
+                    return None
+                try:
+                    opens = await ex.fetch_open_orders(symbol_local)
+                except Exception:
+                    opens = await ex.fetch_open_orders(None)
+            else:
+                opens = await self.ex_hub.fetch_open_orders(ex_name, global_pair=None)
+            ids = set()
+            for o in (opens or []):
+                try:
+                    if symbol_local and not self._same_symbol(o.get("symbol") or "", symbol_local):
+                        continue
+                    oid = o.get("id") or o.get("orderId")
+                    if oid:
+                        ids.add(str(oid))
+                except Exception:
+                    continue
+            return ids
+        except Exception as e:
+            log.warning(f"[fills] fetch_open_orders falhou ({ex_name} {symbol_local}): {e}")
+            return None
+
     async def poll_fills(self) -> None:
+        open_ids_cache: Dict[Tuple[str, str, bool], Optional[set]] = {}
+
+        async def _get_open_ids_cached(ex_name: str, symbol_local: str, force_exchange_query: bool = False) -> Optional[set]:
+            key = (str(ex_name), str(symbol_local), bool(force_exchange_query))
+            if key not in open_ids_cache:
+                open_ids_cache[key] = await self._open_order_ids_for_symbol(
+                    ex_name,
+                    symbol_local,
+                    force_exchange_query=force_exchange_query,
+                )
+            return open_ids_cache.get(key)
+
+        manual_cancel_statuses = {
+            "canceled",
+            "cancelled",
+            "canceled_by_user",
+            "cancelled_by_user",
+        }
+
         for pair, ex_map in list(self.orders.items()):
             for ex_name, sides in list(ex_map.items()):
                 for side, rec in list(sides.items()):
                     if rec.get("filled"):
                         continue
+
                     symbol_local = rec.get("symbol")
                     oid = rec.get("oid")
                     if not oid or not symbol_local:
                         continue
+
+                    oid_str = str(oid)
+                    expected_internal_cancel = oid_str in self._expected_cancel_oids
+                    force_exchange_query = self._is_paper_mode() and (not self._looks_paper_order_id(oid))
+
                     try:
                         o = await self._fetch_order_safe(ex_name, oid, symbol_local)
                         if not isinstance(o, dict):
+                            open_ids = await _get_open_ids_cached(
+                                ex_name,
+                                symbol_local,
+                                force_exchange_query=force_exchange_query,
+                            )
+                            if open_ids is not None and oid_str not in open_ids:
+                                self._slot_cleanup(self.orders, pair, ex_name, side)
+                                self._expected_cancel_oids.discard(oid_str)
+                                if expected_internal_cancel:
+                                    log.info(
+                                        "[%s] %s %s cancelamento interno confirmado por ausencia em open_orders (oid=%s).",
+                                        pair,
+                                        ex_name,
+                                        side.upper(),
+                                        oid,
+                                    )
+                                elif self.recreate_after_external_cancel:
+                                    self._clear_manual_cancel_block(pair, ex_name, side)
+                                    self._emit_event(
+                                        f"[{pair}] {ex_name} {side.upper()} removida na exchange; recriando no proximo ciclo.",
+                                        level="warn",
+                                    )
+                                    log.info(
+                                        "[%s] %s %s sem retorno em fetch_order e ausente em open_orders (oid=%s). Slot limpo para recriacao.",
+                                        pair,
+                                        ex_name,
+                                        side.upper(),
+                                        oid,
+                                    )
+                                else:
+                                    self._block_side_after_manual_cancel(
+                                        pair=pair,
+                                        ex_name=ex_name,
+                                        side=side,
+                                        oid=oid_str,
+                                        reason="ausente em open_orders",
+                                    )
                             continue
                     except Exception:
                         continue
 
                     status = str(o.get("status") or "").lower()
+                    if status in (
+                        "canceled",
+                        "cancelled",
+                        "expired",
+                        "rejected",
+                        "canceled_by_user",
+                        "cancelled_by_user",
+                        "cancelling",
+                        "inactive",
+                        "deleted",
+                    ):
+                        self._slot_cleanup(self.orders, pair, ex_name, side)
+                        self._expected_cancel_oids.discard(oid_str)
+                        if expected_internal_cancel:
+                            log.info(
+                                "[%s] %s %s cancelamento interno confirmado (status=%s, oid=%s).",
+                                pair,
+                                ex_name,
+                                side.upper(),
+                                status,
+                                oid,
+                            )
+                        elif (not self.recreate_after_external_cancel) and (status in manual_cancel_statuses):
+                            self._block_side_after_manual_cancel(
+                                pair=pair,
+                                ex_name=ex_name,
+                                side=side,
+                                oid=oid_str,
+                                reason=f"status={status}",
+                            )
+                        else:
+                            self._clear_manual_cancel_block(pair, ex_name, side)
+                            self._emit_event(
+                                f"[{pair}] {ex_name} {side.upper()} cancelada na exchange; recriando no proximo ciclo.",
+                                level="warn",
+                            )
+                            log.info(
+                                "[%s] %s %s cancelada externamente (oid=%s). Slot limpo para recriacao automatica.",
+                                pair,
+                                ex_name,
+                                side.upper(),
+                                oid,
+                            )
+                        continue
+
+                    if status and status not in (
+                        "open",
+                        "new",
+                        "created",
+                        "pending",
+                        "active",
+                        "partially_filled",
+                        "partial",
+                        "partially-filled",
+                        "closed",
+                        "filled",
+                        "executed",
+                        "done",
+                    ):
+                        open_ids = await _get_open_ids_cached(
+                            ex_name,
+                            symbol_local,
+                            force_exchange_query=force_exchange_query,
+                        )
+                        if open_ids is not None and oid_str not in open_ids:
+                            self._slot_cleanup(self.orders, pair, ex_name, side)
+                            self._expected_cancel_oids.discard(oid_str)
+                            if expected_internal_cancel:
+                                log.info(
+                                    "[%s] %s %s cancelamento interno confirmado (status=%s, oid=%s).",
+                                    pair,
+                                    ex_name,
+                                    side.upper(),
+                                    status,
+                                    oid,
+                                )
+                            elif self.recreate_after_external_cancel:
+                                self._clear_manual_cancel_block(pair, ex_name, side)
+                                self._emit_event(
+                                    f"[{pair}] {ex_name} {side.upper()} removida na exchange; recriando no proximo ciclo.",
+                                    level="warn",
+                                )
+                                log.info(
+                                    "[%s] %s %s status=%s e ausente em open_orders (oid=%s). Slot limpo para recriacao.",
+                                    pair,
+                                    ex_name,
+                                    side.upper(),
+                                    status,
+                                    oid,
+                                )
+                            else:
+                                self._block_side_after_manual_cancel(
+                                    pair=pair,
+                                    ex_name=ex_name,
+                                    side=side,
+                                    oid=oid_str,
+                                    reason=f"status={status}+ausente_em_open_orders",
+                                )
+                            continue
+
                     if status in ("closed", "filled", "executed", "done"):
                         rec["filled"] = True
 
@@ -1390,24 +1760,24 @@ class OrderRouter:
                         if side == "buy":
                             self._emit_event(
                                 f"Compra EXECUTADA: {filled} {base} na {ex_name} a {money} {avg} "
-                                f"(≈ {notional:.2f} {quote})."
+                                f"(~ {notional:.2f} {quote})."
                             )
                             log.info(f"[{pair}] BUY filled {filled} {base} @ {avg} ({ex_name}, {symbol_local})")
                             try:
                                 await self._open_opposite_after_fill(pair, ex_name, symbol_local, "buy", filled)
                             except Exception as e:
-                                log.warning(f"[{pair}] pós-fill SELL falhou ({ex_name} {symbol_local}): {e}")
+                                log.warning(f"[{pair}] pos-fill SELL falhou ({ex_name} {symbol_local}): {e}")
                             self._alert_need_balance(ex_name, symbol_local, quote, "compra executada")
                         else:
                             self._emit_event(
                                 f"Venda EXECUTADA: {filled} {base} na {ex_name} a {money} {avg} "
-                                f"(≈ {notional:.2f} {quote})."
+                                f"(~ {notional:.2f} {quote})."
                             )
                             log.info(f"[{pair}] SELL filled {filled} {base} @ {avg} ({ex_name}, {symbol_local})")
                             try:
                                 await self._open_opposite_after_fill(pair, ex_name, symbol_local, "sell", filled)
                             except Exception as e:
-                                log.warning(f"[{pair}] pós-fill BUY falhou ({ex_name} {symbol_local}): {e}")
+                                log.warning(f"[{pair}] pos-fill BUY falhou ({ex_name} {symbol_local}): {e}")
                             self._alert_need_balance(ex_name, symbol_local, base, "venda executada")
 
         if self.one_cycle_exit:
@@ -1417,8 +1787,7 @@ class OrderRouter:
                         log.info(f"[{pair}] {ex_name}: BUY e SELL executados. Conferir na corretora e reiniciar o bot.")
                         self._should_exit = True
                         return
-
-    # ------------------------- utilitários -------------------------
+    # ------------------------- utilitÃ¡rios -------------------------
 
     @property
     def should_exit(self) -> bool:

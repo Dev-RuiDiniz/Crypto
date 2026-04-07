@@ -1,0 +1,144 @@
+[GLOBAL]
+mode = PAPER
+usdt_brl_rate = 5.43
+ref_price = MEDIAN
+loop_interval_ms = 1200
+print_every_sec = 5
+panel_enabled = true
+panel_redraw_on_change = true
+panel_force_redraw_sec = 0
+panel_header_show_usdt_brl = false
+panel_show_mids = true
+panel_show_balances = true
+api_snapshot_path = data/api_snapshot.json
+sqlite_path = ./data/state.db
+csv_enable = true
+http_timeout_sec = 15
+max_retries = 3
+retry_backoff_ms = 400
+
+[BOOT]
+cancel_open_orders_on_start = false
+cancel_only_configured_pairs = true
+cancel_dry_run = true
+cancel_verify_retries = 2
+cancel_verify_sleep_ms = 800
+cancel_list_details = false
+cancel_list_max = 60
+http_timeout_sec = 15
+max_retries = 3
+retry_backoff_ms = 400
+
+[LOG]
+level = INFO
+file = ./logs/arbit.log
+rotate_mb = 10
+verbose_skips = false
+console_events = true
+events_max = 20
+event_dedup_sec = 90
+
+[RISK]
+max_open_orders_per_pair_per_exchange = 0
+max_gross_exposure_usdt = 500
+kill_switch_drawdown_pct = 25
+cancel_all_on_killswitch = true
+
+[PAIRS]
+list = ADA/USDT,BTC/BRL,VISTA/BRL,VISTA/USDT
+
+[SPREAD]
+btc/brl_buy_pct = 0.01
+sell_pct = 0.04
+vista/brl_sell_pct = 0.10
+buy_pct = 0.04
+vista/usdt_sell_pct = 0.10
+btc/brl_sell_pct = 0.01
+vista/usdt_buy_pct = 0.10
+vista/brl_buy_pct = 0.10
+
+[STAKE]
+btc/usdt_mode = FIXO_USDT
+btc/usdt_value = 5.00
+btc/brl_mode = FIXO_USDT
+btc/brl_value = 5.00
+vista/brl_mode = FIXO_USDT
+vista/brl_value = 25.00
+
+[HEDGE]
+hedge_on_fill = false
+hedge_slippage_bps = 10
+
+[EXCHANGES.mercadobitcoin]
+enabled = false
+api_key = 
+api_secret = 
+password = 
+mbv4_bearer_token = 
+mbv4_login = 
+mbv4_password = 
+mbv4_orders_base = trading_spot
+mbv4_extra_headers = X-Product: spot;X-Account-Id:{auto};X-User-Locale: pt-BR
+fee_maker = 0.001
+fee_taker = 0.001
+
+[EXCHANGES.novadax]
+enabled = true
+api_key = 
+api_secret = 
+password = 
+fee_maker = 0.001
+fee_taker = 0.001
+
+[EXCHANGES.gate]
+enabled = false
+api_key = 
+api_secret = 
+password = 
+fee_maker = 0.0002
+fee_taker = 0.0005
+
+[EXCHANGES.mexc]
+enabled = false
+api_key = 
+api_secret = 
+password = 
+fee_maker = 0.0002
+fee_taker = 0.0006
+
+[SYMBOLS]
+novadax.btc/brl.buy = BTC/BRL
+novadax.btc/brl.sell = BTC/BRL
+novadax.vista/brl.buy = VISTA/BRL
+novadax.vista/brl.sell = VISTA/BRL
+mexc.ada/usdt.buy = ADA/USDT
+mexc.ada/usdt.sell = ADA/USDT
+gateio.vista/usdt.buy = VISTA/USDT
+gateio.vista/usdt.sell = VISTA/USDT
+mercadobitcoin.vista/usdt.buy = VISTA/BRL
+mercadobitcoin.vista/usdt.sell = VISTA/BRL
+mexc.vista/usdt.buy = VISTA/USDT
+mexc.vista/usdt.sell = VISTA/USDT
+novadax.vista/usdt.buy = VISTA/BRL
+novadax.vista/usdt.sell = VISTA/BRL
+
+[MARKETDATA]
+ws_stale_ms = 3000
+ws_reconnect_ms = 5000
+poll_interval_ms = 2000
+orderbook_limit = 20
+
+[ROUTER]
+anchor_mode = LOCAL
+sticky_per_side = true
+min_notional_usdt = 1
+track_local_bps = 1
+reprice_cooldown_sec = 1
+place_both_sides_per_exchange = true
+recreate_after_external_cancel = true
+auto_post_fill_opposite = true
+post_fill_use_filled_qty = true
+alert_cooldown_sec = 120
+balance_ttl_sec = 8
+one_cycle_and_exit = false
+

@@ -272,6 +272,7 @@ a {
   right: 0;
   height: 2px;
   background: var(--orange-gradient);
+  pointer-events: none;
 }
 
 .panel:hover {

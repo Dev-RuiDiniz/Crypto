@@ -10,6 +10,7 @@ import json
 import time
 import os
 import csv
+import contextlib
 import threading
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -35,7 +36,8 @@ class StateStore:
         os.makedirs(os.path.dirname(os.path.abspath(self.sqlite_path)), exist_ok=True)
 
         # Conexão principal
-        self._conn = sqlite3.connect(self.sqlite_path, check_same_thread=False)
+        self._conn = sqlite3.connect(self.sqlite_path, check_same_thread=False, timeout=30)
+        self._conn.execute("PRAGMA busy_timeout=30000;")
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.row_factory = sqlite3.Row
@@ -48,6 +50,11 @@ class StateStore:
         self._fills_csv = os.path.join(base_dir, "fills.csv")
         if self.csv_enable:
             self._ensure_csv_headers()
+
+    def _rollback_quietly(self) -> None:
+        with contextlib.suppress(Exception):
+            if self._conn.in_transaction:
+                self._conn.rollback()
 
     # ------------------------------------------------------------------
     # INIT / SCHEMA
@@ -289,20 +296,6 @@ class StateStore:
                 created_at TEXT NOT NULL,
                 metadata TEXT,
                 FOREIGN KEY (tenant_id) REFERENCES tenants(id)
-            )
-            """
-        )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS pair_spread_config (
-                tenant_id TEXT NOT NULL,
-                symbol TEXT NOT NULL,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                percent REAL NOT NULL DEFAULT 1.0,
-                side_policy TEXT NOT NULL DEFAULT 'BOTH',
-                repricing_interval_ms INTEGER,
-                updated_at TEXT NOT NULL,
-                PRIMARY KEY (tenant_id, symbol)
             )
             """
         )
@@ -649,26 +642,6 @@ class StateStore:
             )
         return out
 
-
-    def get_pair_spread_config(self, tenant_id: str, symbol: str) -> Dict[str, Any]:
-        row = self._conn.execute(
-            """
-            SELECT enabled, percent, side_policy, repricing_interval_ms, updated_at
-            FROM pair_spread_config
-            WHERE tenant_id = ? AND symbol = ?
-            """,
-            (str(tenant_id or "default"), self._normalize_symbol(symbol)),
-        ).fetchone()
-        if not row:
-            return {"enabled": True, "percent": 1.0, "side_policy": "BOTH", "repricing_interval_ms": None, "updated_at": None}
-        return {
-            "enabled": bool(row["enabled"] if isinstance(row, sqlite3.Row) else row[0]),
-            "percent": float((row["percent"] if isinstance(row, sqlite3.Row) else row[1]) or 0.0),
-            "side_policy": str((row["side_policy"] if isinstance(row, sqlite3.Row) else row[2]) or "BOTH"),
-            "repricing_interval_ms": (row["repricing_interval_ms"] if isinstance(row, sqlite3.Row) else row[3]),
-            "updated_at": (row["updated_at"] if isinstance(row, sqlite3.Row) else row[4]),
-        }
-
     def get_enabled_bot_configs(self) -> List[Dict[str, Any]]:
         """
         Retorna bot_config habilitados no formato esperado pelo executor.
@@ -711,6 +684,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[runtime_status] set falha: {e}")
 
     def heartbeat_runtime_status(self, worker_pid: int) -> None:
@@ -725,6 +699,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[runtime_status] heartbeat falha: {e}")
 
     def update_runtime_applied_config(self, config_version: int, applied_at: str, reason: str = "") -> None:
@@ -741,6 +716,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[runtime_status] update applied config falha: {e}")
 
     def log_event(self, event_type: str, payload: Dict[str, Any]):
@@ -752,6 +728,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[event_log] falha: {e}")
 
     def record_order_create(self, live_order) -> None:
@@ -795,6 +772,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[orders][create] falha: {e}")
 
         if self.csv_enable:
@@ -824,6 +802,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[orders][cancel] falha: {e}")
 
         if self.csv_enable:
@@ -862,82 +841,90 @@ class StateStore:
         safe_exchange = str(exchange or "")
         safe_client = str(client_order_id or "")
         safe_side = str(side or "").lower()
+        savepoint = "sp_order_intent"
         with self._tx_lock:
             cur = self._conn.cursor()
-            cur.execute("BEGIN IMMEDIATE")
-            row = cur.execute(
-                """
-                SELECT * FROM orders
-                WHERE tenant_id = ? AND exchange = ? AND client_order_id = ?
-                LIMIT 1
-                """,
-                (safe_tenant, safe_exchange, safe_client),
-            ).fetchone()
+            try:
+                cur.execute(f"SAVEPOINT {savepoint}")
+                row = cur.execute(
+                    """
+                    SELECT * FROM orders
+                    WHERE tenant_id = ? AND exchange = ? AND client_order_id = ?
+                    LIMIT 1
+                    """,
+                    (safe_tenant, safe_exchange, safe_client),
+                ).fetchone()
 
-            if row:
-                status = str(row["status"] or "").lower()
-                dedupe_state = "REUSED"
-                should_submit = status not in {"pending", "placed", "open"}
-                retryable = bool((row["retryable"] if isinstance(row, sqlite3.Row) else 0) or 0)
-                if status == "failed" and not retryable:
-                    should_submit = False
-                    dedupe_state = "BLOCKED"
-                if should_submit:
-                    cur.execute(
-                        """
-                        UPDATE orders
-                        SET status='pending', updated_at=?, dedupe_state=?,
-                            pair=?, side=?, symbol_local=?, price_local=?, amount=?, cycle_id=?,
-                            error_code=NULL
-                        WHERE id=?
-                        """,
-                        (now, dedupe_state, pair, safe_side, symbol_local, float(price_local), float(amount), cycle_id, row["id"]),
-                    )
-                else:
-                    cur.execute("UPDATE orders SET updated_at=?, dedupe_state=? WHERE id=?", (now, dedupe_state, row["id"]))
-                self._conn.commit()
+                if row:
+                    status = str(row["status"] or "").lower()
+                    dedupe_state = "REUSED"
+                    should_submit = status not in {"pending", "placed", "open"}
+                    retryable = bool((row["retryable"] if isinstance(row, sqlite3.Row) else 0) or 0)
+                    if status == "failed" and not retryable:
+                        should_submit = False
+                        dedupe_state = "BLOCKED"
+                    if should_submit:
+                        cur.execute(
+                            """
+                            UPDATE orders
+                            SET status='pending', updated_at=?, dedupe_state=?,
+                                pair=?, side=?, symbol_local=?, price_local=?, amount=?, cycle_id=?,
+                                error_code=NULL
+                            WHERE id=?
+                            """,
+                            (now, dedupe_state, pair, safe_side, symbol_local, float(price_local), float(amount), cycle_id, row["id"]),
+                        )
+                    else:
+                        cur.execute("UPDATE orders SET updated_at=?, dedupe_state=? WHERE id=?", (now, dedupe_state, row["id"]))
+                    cur.execute(f"RELEASE SAVEPOINT {savepoint}")
+                    return {
+                        "id": row["id"],
+                        "client_order_id": safe_client,
+                        "status": row["status"],
+                        "dedupe_state": dedupe_state,
+                        "should_submit": should_submit,
+                    }
+
+                intent_id = f"intent::{safe_exchange}::{safe_client}"
+                cur.execute(
+                    """
+                    INSERT INTO orders
+                    (id, ts, ex_name, pair, side, symbol_local, price_local, amount, status,
+                     tenant_id, exchange, client_order_id, cycle_id, exchange_order_id,
+                     dedupe_state, error_code, retryable, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NULL, 'NEW', NULL, NULL, ?, ?)
+                    """,
+                    (
+                        intent_id,
+                        now,
+                        safe_exchange,
+                        pair,
+                        safe_side,
+                        symbol_local,
+                        float(price_local),
+                        float(amount),
+                        safe_tenant,
+                        safe_exchange,
+                        safe_client,
+                        str(cycle_id or ""),
+                        now,
+                        now,
+                    ),
+                )
+                cur.execute(f"RELEASE SAVEPOINT {savepoint}")
                 return {
-                    "id": row["id"],
+                    "id": intent_id,
                     "client_order_id": safe_client,
-                    "status": row["status"],
-                    "dedupe_state": dedupe_state,
-                    "should_submit": should_submit,
+                    "status": "pending",
+                    "dedupe_state": "NEW",
+                    "should_submit": True,
                 }
-
-            intent_id = f"intent::{safe_exchange}::{safe_client}"
-            cur.execute(
-                """
-                INSERT INTO orders
-                (id, ts, ex_name, pair, side, symbol_local, price_local, amount, status,
-                 tenant_id, exchange, client_order_id, cycle_id, exchange_order_id,
-                 dedupe_state, error_code, retryable, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NULL, 'NEW', NULL, NULL, ?, ?)
-                """,
-                (
-                    intent_id,
-                    now,
-                    safe_exchange,
-                    pair,
-                    safe_side,
-                    symbol_local,
-                    float(price_local),
-                    float(amount),
-                    safe_tenant,
-                    safe_exchange,
-                    safe_client,
-                    str(cycle_id or ""),
-                    now,
-                    now,
-                ),
-            )
-            self._conn.commit()
-            return {
-                "id": intent_id,
-                "client_order_id": safe_client,
-                "status": "pending",
-                "dedupe_state": "NEW",
-                "should_submit": True,
-            }
+            except Exception:
+                with contextlib.suppress(Exception):
+                    cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                with contextlib.suppress(Exception):
+                    cur.execute(f"RELEASE SAVEPOINT {savepoint}")
+                raise
 
     def mark_order_submitted(self, *, tenant_id: str, exchange: str, client_order_id: str, exchange_order_id: str, status: str = "open") -> None:
         now = float(time.time())
@@ -999,6 +986,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[paper_orders] falha: {e}")
 
     def record_fill(self, data: Dict[str, Any]) -> None:
@@ -1029,6 +1017,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[fills][insert] falha: {e}")
 
         if self.csv_enable:
@@ -1301,9 +1290,10 @@ class StateStore:
             cur.execute(
                 """
                 SELECT id, ts, ex_name, pair, side, symbol_local,
+                       client_order_id,
                        price_local, amount, status
                 FROM orders
-                WHERE COALESCE(LOWER(status), '') NOT IN ('canceled','closed')
+                WHERE COALESCE(LOWER(status), '') IN ('pending','open','placed','partially_filled','new')
                 ORDER BY ts DESC
                 LIMIT ?
                 """,
@@ -1318,6 +1308,7 @@ class StateStore:
                     "pair": r["pair"],
                     "side": r["side"],
                     "symbol_local": r["symbol_local"],
+                    "client_order_id": r["client_order_id"],
                     "price_local": r["price_local"],
                     "amount": r["amount"],
                     "status": r["status"],
@@ -1352,6 +1343,7 @@ class StateStore:
             )
             self._conn.commit()
         except Exception as e:
+            self._rollback_quietly()
             log.warning(f"[risk_events][insert] falha: {e}")
 
     def get_risk_events(self, tenant_id: str = "default", symbol: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:

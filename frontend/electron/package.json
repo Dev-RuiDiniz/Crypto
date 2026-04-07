@@ -35,8 +35,8 @@
         "to": "logs"
       },
       {
-        "from": "../../.venv313",
-        "to": ".venv313"
+        "from": "../../.venv-client",
+        "to": ".venv-client"
       },
       {
         "from": "../../bot.py",

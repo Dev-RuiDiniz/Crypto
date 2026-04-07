@@ -69,13 +69,15 @@ class MEXCWsOrderBookProvider(BaseWsOrderBookProvider):
             session = aiohttp.ClientSession()
             self._sessions[tenant_id] = session
         ws = await session.ws_connect(
-            "wss://wbs.mexc.com/ws",
+            "wss://wbs-api.mexc.com/ws",
             heartbeat=20,
+            ssl=False,
             timeout=self.timeout_ms / 1000.0,
         )
         ch_sym = self._to_channel_symbol(symbol)
-        channel = f"spot@public.limit.depth.v3.api@{ch_sym}@{self.depth_limit}"
-        await ws.send_json({"method": "SUBSCRIPTION", "params": [channel], "id": int(time.time() * 1000)})
+        #           spot@public.limit.depth.v3.api.pb@
+        channel = f"spot@public.limit.depth.v3.api.pb@{ch_sym}@{self.depth_limit}"
+        await ws.send_json({"method": "SUBSCRIPTION", "params": [channel]})
         self._sockets[key] = ws
 
     async def recv_snapshot(self, tenant_id: str, exchange: str, symbol: str) -> Dict[str, Any]:
@@ -87,14 +89,22 @@ class MEXCWsOrderBookProvider(BaseWsOrderBookProvider):
                 raise RuntimeError("ws_closed")
             if msg.type == aiohttp.WSMsgType.ERROR:
                 raise RuntimeError("ws_error")
-            if msg.type not in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
+            if msg.type not in (aiohttp.WSMsgType.BINARY,):
                 continue
-            data = msg.json()
-            if not isinstance(data, dict):
-                continue
-            payload = data.get("d") or data.get("data") or data
-            bids = payload.get("bids") or []
-            asks = payload.get("asks") or []
+
+            # noinspection PyUnresolvedReferences
+            data = PushDataV3ApiWrapper_pb2.PushDataV3ApiWrapper()
+
+            data.ParseFromString(msg.data)
+
+            try:
+                data = MessageToDict(data.publicLimitDepths)
+            except Exception as e:
+                print(e)
+                exit(-1)
+
+            bids = data.get('bids') or []
+            asks = data.get('asks') or []
             if not bids and not asks:
                 continue
             return {"bids": bids, "asks": asks, "timestamp": int(time.time() * 1000)}

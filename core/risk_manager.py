@@ -128,6 +128,8 @@ class RiskManager:
         Retorna True se ainda pode abrir mais ordens para esse (pair, exchange).
         (Mantida para compatibilidade; usa o limite global configurado.)
         """
+        if int(self.max_open_per_pair_ex) <= 0:
+            return True
         return open_count_for_pair_ex < self.max_open_per_pair_ex
 
     def exposure_ok(self, current_gross_usdt: float, planned_delta_usdt: float) -> bool:
@@ -148,6 +150,8 @@ class RiskManager:
         Usa a hierarquia de limites por par/lado descrita em open_limit_for().
         """
         limit = self.open_limit_for(pair, side=side)
+        if int(limit) <= 0:
+            return True
         return int(open_count_for_pair_ex) < int(limit)
 
     def exposure_ok_for(

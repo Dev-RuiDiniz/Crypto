@@ -10,11 +10,11 @@
 - `[RISK] MAX_OPEN_ORDERS_PER_PAIR_PER_EXCHANGE, MAX_GROSS_EXPOSURE_USDT`
 - `[GLOBAL] MODE, LOOP_INTERVAL_MS, HTTP_TIMEOUT_SEC, MAX_RETRIES`
 
+## Exchanges suportadas
+- `gateio` (alias aceito: `gate`)
+- `mexc` (alias aceito: `mexc3`)
+- `novadax`
+- `mercadobitcoin` (fallback ccxt: `mercado`)
+
 ## Reload dinâmico
 Alterações via API em `bot-config`/`bot-global-config` incrementam `config_version` e o monitor recarrega sem restart.
-
-
-## Configuração operacional via Frontend (runtime)
-- Todas as configurações operacionais (credenciais, pares, spread, arbitragem, risco, notificações) devem ser realizadas via UI com persistência em SQLite.
-- Alterações de ADMIN geram auditoria (`audit_logs`) e são refletidas no worker sem restart (próximo ciclo).
-- VIEWER permanece read-only em todas as telas de configuração.

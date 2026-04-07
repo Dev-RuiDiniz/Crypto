@@ -133,6 +133,13 @@ class StrategyArbitrageSimple:
             "client_order_id": coid,
         })
         if not decision.allowed:
+            self.state.mark_order_failed(
+                tenant_id=self.tenant_id,
+                exchange=exchange,
+                client_order_id=coid,
+                error_code=str(decision.rule_type or "RISK_BLOCKED"),
+                retryable=True,
+            )
             return {"id": "", "status": "blocked", "clientOrderId": coid, "error": decision.reason, "rule_type": decision.rule_type}
         if not bool(intent.get("should_submit", True)):
             return {

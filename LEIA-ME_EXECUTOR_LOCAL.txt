@@ -1,0 +1,36 @@
+ENTREGA CLIENTE - TRADINGBOT (EXECUTOR LOCAL)
+Data: 2026-03-01
+
+Este pacote NAO usa instalador .exe.
+
+Como executar no PC do cliente:
+1) Extraia o arquivo TradingBot_LocalExecutor.zip.
+2) Abra a pasta extraida TradingBot_LocalExecutor.
+3) Dê duplo clique em EXECUTAR_TRADINGBOT.bat.
+4) Aguarde a instalacao automatica das dependencias.
+5) Acesse o painel em http://127.0.0.1:8000
+
+Importante:
+- Nao mova apenas o .bat/.ps1 sozinho para outra pasta.
+- Execute mantendo a estrutura completa extraida do ZIP.
+
+Requisitos do cliente:
+- Windows 10/11 64 bits
+- Python 3.11+ instalado (com Add Python to PATH)
+- Internet na primeira execucao
+
+Arquivos importantes:
+- EXECUTAR_TRADINGBOT.bat
+- EXECUTAR_TRADINGBOT.ps1
+- MANUAL_CLIENTE_TRADINGBOT.txt
+- MANUAL_CLIENTE_TRADINGBOT.pdf
+
+Novidades (2026-03-05):
+- Fluxo Rapido centralizado em 4 passos (credencial, simbolos, estrategia, rodar).
+- Passo 2 com "Salvar simbolos em lote por exchange" (atalhos BRL/USD/USDT).
+- Aba "Exchanges" sem modal sobreposto (cadastro/rotacao inline para facilitar digitacao).
+- Erros de credencial com detalhe de validacao + correlationId.
+- Robo ignora automaticamente exchange onde o simbolo do par nao estiver listado.
+- Inicializacao derruba processos antigos do bot/api/launcher para evitar instancias duplicadas.
+- Persistencia SQLite reforcada para evitar bloqueio interno de transacao na criacao de ordens.
+- Manual tecnico atualizado: docs/15-manual-moedas-pares-ordens-pareadas.md

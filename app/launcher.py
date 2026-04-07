@@ -14,6 +14,7 @@ import webbrowser
 from pathlib import Path
 
 from app.pathing import ConfigResolutionError, ensure_default_config_in_data_dir, resolve_config_path
+from app.bootstrap import ensure_master_key
 from app.paths import ensure_runtime_dirs, resolve_app_paths
 from app.processes import current_python, spawn_process, terminate_process
 from app.version import APP_VERSION
@@ -108,6 +109,10 @@ def _log_worker_config_failure(
 def main() -> int:
     args = parse_args()
 
+    paths = resolve_app_paths()
+    ensure_runtime_dirs(paths)
+    _, key_source = ensure_master_key(paths)
+
     if args.run_api:
         from api.server import main as api_main
 
@@ -135,14 +140,12 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parents[1]
 
-    paths = resolve_app_paths()
-    ensure_runtime_dirs(paths)
-
     logger = _configure_launcher_logger(paths.log_dir / "app.log")
     logger.info("[BOOT] app_version=%s", APP_VERSION)
     logger.info("[BOOT] DATA_DIR=%s", paths.data_dir)
     logger.info("[BOOT] LOG_DIR=%s", paths.log_dir)
     logger.info("[BOOT] DB_PATH=%s", paths.db_path.resolve())
+    logger.info("[BOOT] MASTER_KEY_SOURCE=%s", key_source)
 
     copied_config = ensure_default_config_in_data_dir()
     if copied_config:
@@ -172,6 +175,7 @@ def main() -> int:
         )
         return 1
     resolved_config = str(config_resolution.path)
+    env["TRADINGBOT_CONFIG_PATH"] = resolved_config
 
     if getattr(sys, "frozen", False):
         api_cmd = [py_bin, "--run-api", "--host", args.host, "--port", str(selected_port), "--db-path", str(paths.db_path)]

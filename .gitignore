@@ -1,0 +1,21 @@
+# Python virtual envs and cache
+.venv/
+.venv-client/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Node/Electron artifacts
+**/node_modules/
+frontend/electron/dist/
+frontend/electron/out/
+
+# Runtime outputs
+logs/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -22,9 +22,13 @@ ALIASES_CCXT = {
 
 
 def _ccxt_id_candidates(ex_name: str) -> list[str]:
-    if ex_name.lower() == "mercadobitcoin":
-        return ["mercadobitcoin", "mercado"]
     low = ex_name.lower()
+    if low == "mercadobitcoin":
+        return ["mercadobitcoin", "mercado"]
+    if low in {"gate", "gateio"}:
+        return ["gate", "gateio"]
+    if low in {"mexc", "mexc3"}:
+        return ["mexc", "mexc3"]
     return [ALIASES_CCXT.get(low, low)]
 
 

@@ -1,20 +1,36 @@
-const React = window.React;
+﻿const React = window.React;
 const { useEffect, useMemo, useState } = React;
 const e = React.createElement;
 
 import { api } from "../utils/api.js";
 import { buildRotatePayload, canManageCredentials } from "../utils/exchangeCredentials.mjs";
 
-const ALLOWED_EXCHANGES = ["mexc", "binance", "bybit", "okx", "kucoin", "mercadobitcoin"];
+const ALLOWED_EXCHANGES = ["gateio", "mexc", "novadax", "mercadobitcoin", "binance", "bybit", "okx", "kucoin"];
 
 function toast(message, isError = false) {
   window.alert(isError ? `Erro: ${message}` : message);
 }
 
 function safeError(err, fallback) {
+  const details = Array.isArray(err && err.details) ? err.details : [];
+  const detailsText = details.length
+    ? ` (${details
+        .map((d) => {
+          const field = d && d.field ? d.field : "campo";
+          const issue = d && d.issue ? d.issue : "invalido";
+          return `${field}: ${issue}`;
+        })
+        .join("; ")})`
+    : "";
   const correlation = err && err.correlationId ? ` (correlationId: ${err.correlationId})` : "";
   if (err && err.status === 403) return `Sem permissão${correlation}`;
-  return `${fallback}${correlation}`;
+  if (err && err.status === 409) {
+    return `Já existe credencial com este label nessa exchange. Use outro label ou rotacione a credencial existente${correlation}`;
+  }
+  if (err && err.message) {
+    return `${err.message}${detailsText}${correlation}`;
+  }
+  return `${fallback}${detailsText}${correlation}`;
 }
 
 function StatusBadge({ status }) {
@@ -44,19 +60,6 @@ function SecretInput({ label, value, onChange, inputId }) {
   );
 }
 
-function Modal({ title, children, onClose }) {
-  return e(
-    "div",
-    { className: "modal-backdrop", role: "dialog", "aria-modal": "true" },
-    e(
-      "div",
-      { className: "modal-panel" },
-      e("div", { className: "modal-header" }, e("h3", null, title), e("button", { className: "btn btn-secondary", onClick: onClose }, "Fechar")),
-      children
-    )
-  );
-}
-
 export function ExchangesSettings() {
   const auth = useMemo(() => api.getAuthContext(), []);
   const isAdmin = useMemo(() => canManageCredentials(auth.roles), [auth.roles]);
@@ -68,14 +71,15 @@ export function ExchangesSettings() {
   const [rotateTarget, setRotateTarget] = useState(null);
   const [pendingTestId, setPendingTestId] = useState(null);
 
-  const [createForm, setCreateForm] = useState({ exchange: "mexc", label: "", apiKey: "", apiSecret: "", passphrase: "", confirmTradeOnly: false });
+  const [createForm, setCreateForm] = useState({ exchange: "gateio", label: "", apiKey: "", apiSecret: "", passphrase: "", confirmTradeOnly: false });
   const [rotateForm, setRotateForm] = useState({ label: "", status: "ACTIVE", apiKey: "", apiSecret: "", passphrase: "" });
 
   const load = async () => {
     setLoading(true);
     try {
       const data = await api.getExchangeCredentials(auth.tenantId);
-      setRows((data.items || []).map((x) => ({ ...x, testOkUntil: 0 })));
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setRows(items.map((x) => ({ ...x, testOkUntil: 0 })));
       setError(null);
     } catch (err) {
       setError(safeError(err, "Falha ao carregar credenciais"));
@@ -88,11 +92,22 @@ export function ExchangesSettings() {
     load();
   }, []);
 
-  const resetCreate = () => setCreateForm({ exchange: "mexc", label: "", apiKey: "", apiSecret: "", passphrase: "", confirmTradeOnly: false });
+  const resetCreate = () => setCreateForm({ exchange: "gateio", label: "", apiKey: "", apiSecret: "", passphrase: "", confirmTradeOnly: false });
   const resetRotate = () => setRotateForm({ label: "", status: "ACTIVE", apiKey: "", apiSecret: "", passphrase: "" });
 
   const onCreate = async (ev) => {
     ev.preventDefault();
+    const labelNorm = String(createForm.label || "").trim().toLowerCase();
+    const exchangeNorm = String(createForm.exchange || "").trim().toLowerCase();
+    const duplicated = rows.some(
+      (row) =>
+        String(row.exchange || "").trim().toLowerCase() === exchangeNorm &&
+        String(row.label || "").trim().toLowerCase() === labelNorm
+    );
+    if (duplicated) {
+      toast("Já existe credencial com este label nessa exchange. Altere o label ou use Rotacionar.", true);
+      return;
+    }
     try {
       await api.createExchangeCredential(auth.tenantId, {
         exchange: createForm.exchange,
@@ -160,15 +175,27 @@ export function ExchangesSettings() {
 
   return e(
     "div",
-    { className: "panel" },
+    { className: "panel exchanges-panel" },
     e("h2", null, "Exchanges"),
     e("p", { className: "text-muted" }, "Gerencie credenciais de exchange por conta/tenant."),
     e("div", { className: "alert alert-error" }, "Use apenas permissões de TRADE. NÃO habilite WITHDRAW."),
-    isAdmin && e("button", { className: "btn btn-primary", onClick: () => setShowCreate(true) }, "Adicionar credencial"),
+    isAdmin &&
+      e(
+        "button",
+        {
+          className: "btn btn-primary",
+          onClick: () => {
+            setRotateTarget(null);
+            resetRotate();
+            setShowCreate(true);
+          }
+        },
+        "Adicionar credencial"
+      ),
 
     loading && e("div", { className: "loading" }, e("div", { className: "loading-spinner" }), "Carregando credenciais..."),
     !loading && error && e("div", { className: "alert alert-error" }, error, e("button", { className: "btn btn-secondary", onClick: load }, "Tentar novamente")),
-    !loading && !error && rows.length === 0 && e("div", { className: "empty-state" }, "Nenhuma credencial cadastrada.", isAdmin && e("div", null, e("button", { className: "btn btn-primary", onClick: () => setShowCreate(true) }, "Adicionar credencial"))),
+    !loading && !error && rows.length === 0 && e("div", { className: "empty-state" }, "Nenhuma credencial cadastrada.", isAdmin && e("div", null, e("button", { className: "btn btn-primary", onClick: () => { setRotateTarget(null); resetRotate(); setShowCreate(true); } }, "Adicionar credencial"))),
 
     !loading && !error && rows.length > 0 &&
       e("div", { className: "table-wrapper" },
@@ -189,7 +216,15 @@ export function ExchangesSettings() {
               e("td", null, e(StatusBadge, { status: row.status }), row.testOkUntil > Date.now() && e("span", { className: "status-badge status-success" }, "TEST OK")),
               e("td", null, fmtDate(row.updatedAt)),
               e("td", { className: "actions-inline" },
-                isAdmin && e("button", { className: "btn btn-secondary", onClick: () => { setRotateTarget(row); setRotateForm({ label: row.label || "", status: row.status || "ACTIVE", apiKey: "", apiSecret: "", passphrase: "" }); } }, "Rotacionar"),
+                isAdmin &&
+                  e("button", {
+                    className: "btn btn-secondary",
+                    onClick: () => {
+                      setShowCreate(false);
+                      setRotateTarget(row);
+                      setRotateForm({ label: row.label || "", status: row.status || "ACTIVE", apiKey: "", apiSecret: "", passphrase: "" });
+                    }
+                  }, "Rotacionar"),
                 isAdmin && e("button", { className: "btn btn-secondary", onClick: () => onTest(row.id), disabled: pendingTestId === row.id }, pendingTestId === row.id ? "Testando..." : "Testar"),
                 isAdmin && e("button", { className: "btn btn-danger", onClick: () => onRevoke(row.id) }, "Revogar"),
                 !isAdmin && e("span", { className: "text-muted" }, "Somente leitura")
@@ -199,29 +234,42 @@ export function ExchangesSettings() {
         )
       ),
 
-    showCreate && e(Modal, { title: "Adicionar credencial", onClose: () => { setShowCreate(false); resetCreate(); } },
-      e("form", { onSubmit: onCreate },
-        e("div", { className: "form-row" }, e("label", null, "Exchange"), e("select", { value: createForm.exchange, onChange: (ev) => setCreateForm({ ...createForm, exchange: ev.target.value }) }, ALLOWED_EXCHANGES.map((ex) => e("option", { key: ex, value: ex }, ex)))),
-        e("div", { className: "form-row" }, e("label", null, "Label"), e("input", { value: createForm.label, onChange: (ev) => setCreateForm({ ...createForm, label: ev.target.value }), required: true })),
-        e(SecretInput, { label: "API Key", inputId: "create-api-key", value: createForm.apiKey, onChange: (ev) => setCreateForm({ ...createForm, apiKey: ev.target.value }) }),
-        e(SecretInput, { label: "API Secret", inputId: "create-api-secret", value: createForm.apiSecret, onChange: (ev) => setCreateForm({ ...createForm, apiSecret: ev.target.value }) }),
-        e(SecretInput, { label: "Passphrase (opcional)", inputId: "create-passphrase", value: createForm.passphrase, onChange: (ev) => setCreateForm({ ...createForm, passphrase: ev.target.value }) }),
-        e("label", { className: "checkbox-row" }, e("input", { type: "checkbox", checked: createForm.confirmTradeOnly, onChange: (ev) => setCreateForm({ ...createForm, confirmTradeOnly: ev.target.checked }), required: true }), "Confirmo que NÃO habilitei permissão de withdraw"),
-        e("div", { className: "form-actions" }, e("button", { type: "button", className: "btn btn-secondary", onClick: () => { setShowCreate(false); resetCreate(); } }, "Cancelar"), e("button", { type: "submit", className: "btn btn-primary" }, "Salvar"))
-      )
-    ),
+    showCreate &&
+      e(
+        "div",
+        { className: "panel exchanges-inline-form" },
+        e("h3", null, "Adicionar credencial"),
+        e(
+          "form",
+          { onSubmit: onCreate },
+          e("div", { className: "form-row" }, e("label", null, "Exchange"), e("select", { value: createForm.exchange, onChange: (ev) => setCreateForm({ ...createForm, exchange: ev.target.value }) }, ALLOWED_EXCHANGES.map((ex) => e("option", { key: ex, value: ex }, ex)))),
+          e("div", { className: "form-row" }, e("label", null, "Label"), e("input", { value: createForm.label, onChange: (ev) => setCreateForm({ ...createForm, label: ev.target.value }), required: true })),
+          e(SecretInput, { label: "API Key", inputId: "create-api-key", value: createForm.apiKey, onChange: (ev) => setCreateForm({ ...createForm, apiKey: ev.target.value }) }),
+          e(SecretInput, { label: "API Secret", inputId: "create-api-secret", value: createForm.apiSecret, onChange: (ev) => setCreateForm({ ...createForm, apiSecret: ev.target.value }) }),
+          e(SecretInput, { label: "Passphrase (opcional)", inputId: "create-passphrase", value: createForm.passphrase, onChange: (ev) => setCreateForm({ ...createForm, passphrase: ev.target.value }) }),
+          e("label", { className: "checkbox-row" }, e("input", { type: "checkbox", checked: createForm.confirmTradeOnly, onChange: (ev) => setCreateForm({ ...createForm, confirmTradeOnly: ev.target.checked }), required: true }), "Confirmo que NÃO habilitei permissão de withdraw"),
+          e("div", { className: "form-actions" }, e("button", { type: "button", className: "btn btn-secondary", onClick: () => { setShowCreate(false); resetCreate(); } }, "Cancelar"), e("button", { type: "submit", className: "btn btn-primary" }, "Salvar"))
+        )
+      ),
 
-    rotateTarget && e(Modal, { title: "Rotacionar credencial", onClose: () => { setRotateTarget(null); resetRotate(); } },
-      e("form", { onSubmit: onRotate },
-        e("div", { className: "form-row" }, e("label", null, "Label"), e("input", { value: rotateForm.label, onChange: (ev) => setRotateForm({ ...rotateForm, label: ev.target.value }), required: true })),
-        e("div", { className: "form-row" }, e("label", null, "Status"), e("select", { value: rotateForm.status, onChange: (ev) => setRotateForm({ ...rotateForm, status: ev.target.value }) }, e("option", { value: "ACTIVE" }, "ACTIVE"), e("option", { value: "INACTIVE" }, "INACTIVE"))),
-        e("p", { className: "text-muted" }, "Se preencher novos valores, a versão será incrementada e o robô pode recarregar credenciais."),
-        e(SecretInput, { label: "Nova API Key (opcional)", inputId: "rotate-api-key", value: rotateForm.apiKey, onChange: (ev) => setRotateForm({ ...rotateForm, apiKey: ev.target.value }) }),
-        e(SecretInput, { label: "Novo API Secret (opcional)", inputId: "rotate-api-secret", value: rotateForm.apiSecret, onChange: (ev) => setRotateForm({ ...rotateForm, apiSecret: ev.target.value }) }),
-        e(SecretInput, { label: "Nova Passphrase (opcional)", inputId: "rotate-passphrase", value: rotateForm.passphrase, onChange: (ev) => setRotateForm({ ...rotateForm, passphrase: ev.target.value }) }),
-        e("div", { className: "form-actions" }, e("button", { type: "button", className: "btn btn-secondary", onClick: () => { setRotateTarget(null); resetRotate(); } }, "Cancelar"), e("button", { type: "submit", className: "btn btn-primary" }, "Salvar"))
+    rotateTarget &&
+      e(
+        "div",
+        { className: "panel exchanges-inline-form" },
+        e("h3", null, `Rotacionar credencial (${rotateTarget.exchange || "-"})`),
+        e(
+          "form",
+          { onSubmit: onRotate },
+          e("div", { className: "form-row" }, e("label", null, "Label"), e("input", { value: rotateForm.label, onChange: (ev) => setRotateForm({ ...rotateForm, label: ev.target.value }), required: true })),
+          e("div", { className: "form-row" }, e("label", null, "Status"), e("select", { value: rotateForm.status, onChange: (ev) => setRotateForm({ ...rotateForm, status: ev.target.value }) }, e("option", { value: "ACTIVE" }, "ACTIVE"), e("option", { value: "INACTIVE" }, "INACTIVE"))),
+          e("p", { className: "text-muted" }, "Se preencher novos valores, a versao sera incrementada e o robo pode recarregar credenciais."),
+          e(SecretInput, { label: "Nova API Key (opcional)", inputId: "rotate-api-key", value: rotateForm.apiKey, onChange: (ev) => setRotateForm({ ...rotateForm, apiKey: ev.target.value }) }),
+          e(SecretInput, { label: "Novo API Secret (opcional)", inputId: "rotate-api-secret", value: rotateForm.apiSecret, onChange: (ev) => setRotateForm({ ...rotateForm, apiSecret: ev.target.value }) }),
+          e(SecretInput, { label: "Nova Passphrase (opcional)", inputId: "rotate-passphrase", value: rotateForm.passphrase, onChange: (ev) => setRotateForm({ ...rotateForm, passphrase: ev.target.value }) }),
+          e("div", { className: "form-actions" }, e("button", { type: "button", className: "btn btn-secondary", onClick: () => { setRotateTarget(null); resetRotate(); } }, "Cancelar"), e("button", { type: "submit", className: "btn btn-primary" }, "Salvar"))
+        )
       )
-    )
   );
 }
+
 

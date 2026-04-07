@@ -1,29 +1,16 @@
 const React = window.React;
-const { useState, useEffect } = React;
+const { useState } = React;
 const e = React.createElement;
 
-import { Dashboard } from "./components/Dashboard.js";
-import { TradingSettings } from "./components/TradingSettings.js";
+import { ControlCenter } from "./components/ControlCenter.js";
 import { ExchangesSettings } from "./components/ExchangesSettings.js";
-import { NotificationsSettings } from "./components/NotificationsSettings.js";
-import { GoLiveChecklist } from "./components/GoLiveChecklist.js";
-
-const REFRESH_MS = 2000;
+import { ExchangesStatus } from "./components/ExchangesStatus.js";
+import { AssetsPairsSettings } from "./components/AssetsPairsSettings.js";
+import { PairAutomationSettings } from "./components/PairAutomationSettings.js";
+import { QuickStartFlow } from "./components/QuickStartFlow.js";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [settingsTab, setSettingsTab] = useState("exchanges");
-  const [lastUpdate, setLastUpdate] = useState(null);
-
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setLastUpdate(now.toLocaleTimeString("pt-BR", { hour12: false }));
-    };
-    tick();
-    const id = setInterval(tick, REFRESH_MS);
-    return () => clearInterval(id);
-  }, []);
+  const [activeTab, setActiveTab] = useState("quick");
 
   return e(
     "div",
@@ -34,14 +21,15 @@ export default function App() {
       e(
         "div",
         { className: "app-header-inner" },
-        e("div", null, e("h1", null, "ARBIT Terminal"), e("span", null, "Operação via DB (Sprint 3)")),
+        e("div", null, e("h1", null, "ARBIT Terminal"), e("span", null, "Interface simplificada para operacao do cliente")),
         e(
           "div",
           { className: "tabs" },
-          e("button", { className: "tab-button" + (activeTab === "dashboard" ? " tab-button-active" : ""), onClick: () => setActiveTab("dashboard") }, "Dashboard"),
-          e("button", { className: "tab-button" + (activeTab === "bot-config" ? " tab-button-active" : ""), onClick: () => setActiveTab("bot-config") }, "Trading"),
-          e("button", { className: "tab-button" + (activeTab === "settings" ? " tab-button-active" : ""), onClick: () => setActiveTab("settings") }, "Configurações"),
-          e("button", { className: "tab-button" + (activeTab === "go-live" ? " tab-button-active" : ""), onClick: () => setActiveTab("go-live") }, "Go Live")
+          e("button", { className: "tab-button" + (activeTab === "quick" ? " tab-button-active" : ""), onClick: () => setActiveTab("quick") }, "Fluxo Rapido"),
+          e("button", { className: "tab-button" + (activeTab === "strategy" ? " tab-button-active" : ""), onClick: () => setActiveTab("strategy") }, "Estrategia por Par"),
+          e("button", { className: "tab-button" + (activeTab === "assets" ? " tab-button-active" : ""), onClick: () => setActiveTab("assets") }, "Moedas e Pares"),
+          e("button", { className: "tab-button" + (activeTab === "exchanges" ? " tab-button-active" : ""), onClick: () => setActiveTab("exchanges") }, "Exchanges"),
+          e("button", { className: "tab-button" + (activeTab === "operation" ? " tab-button-active" : ""), onClick: () => setActiveTab("operation") }, "Operacao")
         )
       )
     ),
@@ -51,30 +39,15 @@ export default function App() {
       e(
         "div",
         { className: "container" },
-        activeTab === "dashboard"
-          ? e(React.Fragment, null,
-              e("div", { className: "dashboard-status" },
-                e("span", { className: "status-indicator" }),
-                `Atualização automática: ${REFRESH_MS / 1000}s`,
-                lastUpdate ? ` | Última atualização: ${lastUpdate}` : ""
-              ),
-              e(Dashboard, { refreshMs: REFRESH_MS })
-            )
-          : activeTab === "bot-config"
-            ? e(TradingSettings)
-            : activeTab === "go-live"
-              ? e(GoLiveChecklist)
-              : e(React.Fragment, null,
-                e("div", { className: "panel" },
-                  e("h2", null, "Configurações"),
-                  e("div", { className: "tabs" },
-                    e("button", { className: "tab-button" + (settingsTab === "exchanges" ? " tab-button-active" : ""), onClick: () => setSettingsTab("exchanges") }, "Exchanges"),
-                    e("button", { className: "tab-button" + (settingsTab === "notifications" ? " tab-button-active" : ""), onClick: () => setSettingsTab("notifications") }, "Notificações")
-                  )
-                ),
-                settingsTab === "exchanges" && e(ExchangesSettings),
-                settingsTab === "notifications" && e(NotificationsSettings)
-              )
+        activeTab === "quick"
+          ? e(QuickStartFlow)
+          : activeTab === "strategy"
+          ? e(PairAutomationSettings)
+          : activeTab === "assets"
+          ? e(AssetsPairsSettings)
+          : activeTab === "exchanges"
+          ? e("div", { className: "exchanges-stack" }, e(ExchangesSettings), e(ExchangesStatus))
+          : e(ControlCenter)
       )
     )
   );

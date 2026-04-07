@@ -1,17 +1,17 @@
-import os
+﻿import os
 import json
 import logging
 import sqlite3
 import time
 from datetime import datetime
 from configparser import ConfigParser, NoOptionError, NoSectionError
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set, Tuple
 
 from app.pathing import ConfigResolutionError, get_work_dir, resolve_config_path
 
 logger = logging.getLogger(__name__)
 
-# Se por algum motivo ninguém configurou logging, garante algo no console
+# Se por algum motivo ninguÃ©m configurou logging, garante algo no console
 if not logger.handlers:
     logging.basicConfig(
         level=logging.INFO,
@@ -38,10 +38,40 @@ def _normalize_db_path(db_path: str) -> str:
     return resolved
 
 
+def _sqlite_connect(db_path: str, timeout_sec: float = 30.0) -> sqlite3.Connection:
+    """
+    ConexÃ£o SQLite com busy timeout para reduzir falhas intermitentes de lock
+    quando API e worker gravam simultaneamente.
+    """
+    conn = sqlite3.connect(db_path, timeout=float(timeout_sec))
+    try:
+        conn.execute(f"PRAGMA busy_timeout = {int(float(timeout_sec) * 1000)}")
+    except Exception:
+        pass
+    return conn
+
+
 def _ts_to_iso8601(ts: Optional[float]) -> Optional[str]:
     if not ts:
         return None
     return datetime.utcfromtimestamp(float(ts)).isoformat(timespec="seconds") + "Z"
+
+
+def _row_value(row: Any, key: str, idx: int = 0, default: Any = None) -> Any:
+    """
+    Acessa valor de sqlite3.Row/dict por chave ou tuple/list por Ã­ndice.
+    Evita erro "tuple indices must be integers or slices, not str".
+    """
+    if row is None:
+        return default
+    try:
+        if isinstance(row, (tuple, list)):
+            return row[idx] if len(row) > idx else default
+        if isinstance(row, dict):
+            return row.get(key, default)
+        return row[key]
+    except Exception:
+        return default
 
 
 def _classify_worker_status(last_heartbeat_at: Optional[float], stale_after_sec: int) -> str:
@@ -78,10 +108,10 @@ def _get_config_version_payload(conn: sqlite3.Connection) -> Dict[str, Any]:
         "SELECT version, updated_at, updated_by, reason FROM config_version WHERE id = 1"
     ).fetchone()
     return {
-        "version": int(row["version"] or 1) if row else 1,
-        "updated_at": str(row["updated_at"] or "") if row else "",
-        "updated_by": str((row["updated_by"] or "") if row else ""),
-        "reason": str((row["reason"] or "") if row else ""),
+        "version": int(_row_value(row, "version", 0, 1) or 1),
+        "updated_at": str(_row_value(row, "updated_at", 1, "") or ""),
+        "updated_by": str(_row_value(row, "updated_by", 2, "") or ""),
+        "reason": str(_row_value(row, "reason", 3, "") or ""),
     }
 
 
@@ -100,7 +130,7 @@ def _bump_config_version(conn: sqlite3.Connection, reason: str, updated_by: str 
         (now_iso, str(updated_by or "api"), str(reason or "config updated")),
     )
     row = conn.execute("SELECT version FROM config_version WHERE id = 1").fetchone()
-    return int(row["version"] or 1) if row else 1
+    return int(_row_value(row, "version", 0, 1) or 1)
 
 
 def _ensure_runtime_status_schema(conn: sqlite3.Connection) -> None:
@@ -158,21 +188,21 @@ def _resolve_sqlite_path(cfg: Optional[ConfigParser] = None) -> str:
     return _normalize_db_path(os.path.normpath(sqlite_cfg))
 
 
-# ================== INTEGRAÇÃO COM ESTADO COMPARTILHADO (API ↔ BOT) ==================
+# ================== INTEGRAÃ‡ÃƒO COM ESTADO COMPARTILHADO (API â†” BOT) ==================
 
 try:
-    # Execução como pacote (api.handlers)
+    # ExecuÃ§Ã£o como pacote (api.handlers)
     from .shared_state import get_snapshot as _shared_get_snapshot
 except Exception:
     try:
-        # Execução direta (python handlers.py)
+        # ExecuÃ§Ã£o direta (python handlers.py)
         from shared_state import get_snapshot as _shared_get_snapshot
     except Exception:
         _shared_get_snapshot = None  # sem API acoplada; devolvemos estruturas vazias
 
 
 def _empty_snapshot() -> Dict[str, Any]:
-    """Estrutura vazia padrão, usada quando não há snapshot em memória/arquivo."""
+    """Estrutura vazia padrÃ£o, usada quando nÃ£o hÃ¡ snapshot em memÃ³ria/arquivo."""
     return {
         "timestamp": None,
         "mode": "UNKNOWN",
@@ -186,19 +216,25 @@ def _empty_snapshot() -> Dict[str, Any]:
     }
 
 
-# ================== CONFIG / LOCALIZAÇÃO DO SNAPSHOT EM ARQUIVO ==================
+# ================== CONFIG / LOCALIZAÃ‡ÃƒO DO SNAPSHOT EM ARQUIVO ==================
 
 
 def _resolve_config_path() -> Optional[str]:
+    config_hint = (os.getenv("TRADINGBOT_CONFIG_PATH", "") or "").strip() or "config.txt"
     try:
-        return str(resolve_config_path("config.txt", must_exist=True).path)
+        return str(resolve_config_path(config_hint, must_exist=True).path)
     except ConfigResolutionError as exc:
-        logger.warning("[API] config.txt não encontrado. Caminhos tentados: %s", ", ".join(str(p) for p in exc.tried_paths))
+        logger.warning(
+            "[API] config nao encontrado (%s). Caminhos tentados: %s",
+            config_hint,
+            ", ".join(str(p) for p in exc.tried_paths),
+        )
         return None
 
 
 def _resolve_writable_config_path() -> str:
-    return str(resolve_config_path("config.txt", must_exist=False).path)
+    config_hint = (os.getenv("TRADINGBOT_CONFIG_PATH", "") or "").strip() or "config.txt"
+    return str(resolve_config_path(config_hint, must_exist=False).path)
 
 
 def _load_config() -> ConfigParser:
@@ -206,8 +242,85 @@ def _load_config() -> ConfigParser:
     config_path = _resolve_config_path()
     if config_path:
         logger.debug("[API] Lendo config INI em %s", config_path)
-        cfg.read(config_path, encoding="utf-8")
+        # utf-8-sig tolera arquivo com BOM (ex.: salvo por PowerShell Set-Content -Encoding UTF8)
+        with open(config_path, "r", encoding="utf-8-sig") as f:
+            cfg.read_file(f)
     return cfg
+
+
+_KNOWN_QUOTES = (
+    "USDT",
+    "USDC",
+    "USD",
+    "BRL",
+    "BTC",
+    "ETH",
+    "EUR",
+    "GBP",
+    "TRY",
+    "BUSD",
+)
+
+
+def _normalize_pair_token(raw: str) -> str:
+    token = str(raw or "").strip().upper()
+    if not token:
+        return ""
+    token = token.replace("_", "/").replace("-", "/")
+    token = token.split(":", 1)[0].strip()
+    if "/" in token:
+        left, right = token.split("/", 1)
+        left = left.strip().upper()
+        right = right.strip().upper()
+        if left and right:
+            return f"{left}/{right}"
+        return ""
+    for quote in sorted(_KNOWN_QUOTES, key=len, reverse=True):
+        if token.endswith(quote) and len(token) > len(quote):
+            base = token[: -len(quote)].strip().upper()
+            if base:
+                return f"{base}/{quote}"
+    return ""
+
+
+def _split_pair_token(raw: str) -> Tuple[str, str]:
+    normalized = _normalize_pair_token(raw)
+    if not normalized or "/" not in normalized:
+        return "", ""
+    base, quote = normalized.split("/", 1)
+    return base.strip().upper(), quote.strip().upper()
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND lower(name)=lower(?) LIMIT 1",
+        (str(table_name),),
+    ).fetchone()
+    return bool(row)
+
+
+def _load_db_pairs(sqlite_path: str) -> List[str]:
+    if not sqlite_path or not os.path.exists(sqlite_path):
+        return []
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        if not _table_exists(conn, "config_pairs"):
+            return []
+        rows = conn.execute("SELECT symbol FROM config_pairs ORDER BY symbol").fetchall()
+        out: List[str] = []
+        for row in rows:
+            sym = ""
+            if isinstance(row, sqlite3.Row):
+                sym = str(row["symbol"] or "").strip()
+            elif isinstance(row, (tuple, list)) and row:
+                sym = str(row[0] or "").strip()
+            if sym:
+                out.append(sym)
+        return out
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 def _resolve_snapshot_path_from_config() -> Optional[str]:
@@ -236,7 +349,7 @@ def _resolve_snapshot_path_from_config() -> Optional[str]:
         else:
             candidates.append(raw_path)
 
-    # Caminho padrão usado pelo monitor
+    # Caminho padrÃ£o usado pelo monitor
     candidates.append(os.path.join(PROJECT_ROOT, "data", "api_snapshot.json"))
 
     # Normaliza e remove duplicados mantendo ordem
@@ -260,12 +373,12 @@ def _resolve_snapshot_path_from_config() -> Optional[str]:
     return None
 
 
-# ================== SNAPSHOT EM MEMÓRIA + FALLBACK PARA ARQUIVO ==================
+# ================== SNAPSHOT EM MEMÃ“RIA + FALLBACK PARA ARQUIVO ==================
 
 
 def _load_snapshot_from_file() -> Dict[str, Any]:
     """
-    Lê o snapshot a partir do arquivo JSON gerado pelo monitor
+    LÃª o snapshot a partir do arquivo JSON gerado pelo monitor
     (normalmente data/api_snapshot.json).
     """
     path = _resolve_snapshot_path_from_config()
@@ -277,7 +390,7 @@ def _load_snapshot_from_file() -> Dict[str, Any]:
             snap = json.load(f)
         if not isinstance(snap, dict):
             logger.warning(
-                "[API] Snapshot no arquivo %s não é um dict. Tipo=%s",
+                "[API] Snapshot no arquivo %s nÃ£o Ã© um dict. Tipo=%s",
                 path,
                 type(snap),
             )
@@ -298,7 +411,7 @@ def _load_snapshot_from_file() -> Dict[str, Any]:
 
 def _normalize_snapshot_structure(snap: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Garante que o snapshot tenha sempre as chaves básicas.
+    Garante que o snapshot tenha sempre as chaves bÃ¡sicas.
     """
     snap.setdefault("timestamp", None)
     snap.setdefault("mode", "UNKNOWN")
@@ -329,15 +442,15 @@ def _snapshot_has_data(snap: Dict[str, Any]) -> bool:
 
 def _load_snapshot() -> Dict[str, Any]:
     """
-    1) Tenta ler o snapshot em memória via api.shared_state (quando bot+API
+    1) Tenta ler o snapshot em memÃ³ria via api.shared_state (quando bot+API
        estiverem no MESMO processo).
-    2) Se vier vazio ou indisponível, faz fallback para o arquivo JSON
+    2) Se vier vazio ou indisponÃ­vel, faz fallback para o arquivo JSON
        gerado pelo monitor (data/api_snapshot.json).
     """
 
     snap: Optional[Dict[str, Any]] = None
 
-    # ---------- TENTA PRIMEIRO EM MEMÓRIA ----------
+    # ---------- TENTA PRIMEIRO EM MEMÃ“RIA ----------
     if _shared_get_snapshot is not None:
         try:
             snap = _shared_get_snapshot()
@@ -355,7 +468,7 @@ def _load_snapshot() -> Dict[str, Any]:
                 mids = snap.get("mids") or {}
                 orders = snap.get("orders") or []
                 logger.info(
-                    "[API] Snapshot em memória: exchanges_balances=%d, pares_mids=%d, ordens=%d",
+                    "[API] Snapshot em memÃ³ria: exchanges_balances=%d, pares_mids=%d, ordens=%d",
                     len(balances.keys()),
                     len(mids.keys()),
                     len(orders)
@@ -371,17 +484,17 @@ def _load_snapshot() -> Dict[str, Any]:
             return snap
         else:
             logger.info(
-                "[API] Snapshot em memória está vazio (mode=%s) – tentando arquivo JSON.",
+                "[API] Snapshot em memÃ³ria estÃ¡ vazio (mode=%s) â€“ tentando arquivo JSON.",
                 snap.get("mode"),
             )
     else:
         if _shared_get_snapshot is None:
             logger.info(
-                "[API] shared_state.get_snapshot não disponível – usando apenas arquivo JSON."
+                "[API] shared_state.get_snapshot nÃ£o disponÃ­vel â€“ usando apenas arquivo JSON."
             )
         else:
             logger.info(
-                "[API] Snapshot em memória ainda não inicializado – tentando arquivo JSON."
+                "[API] Snapshot em memÃ³ria ainda nÃ£o inicializado â€“ tentando arquivo JSON."
             )
 
     # ---------- FALLBACK PARA ARQUIVO ----------
@@ -440,7 +553,7 @@ def _safe_bool(val, default: bool = False) -> bool:
     return bool(default)
 
 
-# ================== FUNÇÃO AUXILIAR PARA FALLBACK DE PARÂMETROS ==================
+# ================== FUNÃ‡ÃƒO AUXILIAR PARA FALLBACK DE PARÃ‚METROS ==================
 
 def _get_param_with_fallback(
     cfg: ConfigParser,
@@ -450,10 +563,10 @@ def _get_param_with_fallback(
     fallback_keys: Optional[List[str]] = None
 ) -> int:
     """
-    Obtém um parâmetro inteiro com múltiplos fallbacks.
+    ObtÃ©m um parÃ¢metro inteiro com mÃºltiplos fallbacks.
     1. Tenta [GLOBAL][key]
-    2. Tenta seções de fallback (ex: [BOOT][key])
-    3. Tenta chaves alternativas (ex: HTTP_TIMEOUT ao invés de HTTP_TIMEOUT_SEC)
+    2. Tenta seÃ§Ãµes de fallback (ex: [BOOT][key])
+    3. Tenta chaves alternativas (ex: HTTP_TIMEOUT ao invÃ©s de HTTP_TIMEOUT_SEC)
     4. Usa default
     """
     sections_to_try = ["GLOBAL"]
@@ -473,12 +586,12 @@ def _get_param_with_fallback(
                 value = cfg.get(section, k)
                 if value is not None:
                     result = int(value)
-                    logger.debug(f"[API] Parâmetro {key}={result} carregado de [{section}][{k}]")
+                    logger.debug(f"[API] ParÃ¢metro {key}={result} carregado de [{section}][{k}]")
                     return result
             except (KeyError, ValueError, NoOptionError, NoSectionError):
                 continue
     
-    logger.debug(f"[API] Parâmetro {key} não encontrado, usando default={default}")
+    logger.debug(f"[API] ParÃ¢metro {key} nÃ£o encontrado, usando default={default}")
     return default
 
 
@@ -487,15 +600,15 @@ def _get_param_with_fallback(
 
 def get_config() -> Dict[str, Any]:
     """
-    Lê parâmetros do config para o painel de configurações.
+    LÃª parÃ¢metros do config para o painel de configuraÃ§Ãµes.
 
-    Mantém os campos antigos (mode/usdt_brl_rate/…) para compatibilidade
-    e adiciona grupos organizados (global, boot, router, risk, log, …)
+    MantÃ©m os campos antigos (mode/usdt_brl_rate/â€¦) para compatibilidade
+    e adiciona grupos organizados (global, boot, router, risk, log, â€¦)
     para o novo painel.
     """
     cfg = _load_config()
 
-    # --- GLOBAL / painel / persistência ---
+    # --- GLOBAL / painel / persistÃªncia ---
     if cfg.has_section("GLOBAL"):
         gsect = cfg["GLOBAL"]
     elif cfg.has_section("GENERAL"):  # legado
@@ -524,7 +637,7 @@ def get_config() -> Dict[str, Any]:
         "panel_show_balances": _safe_bool(
             gsect.get("PANEL_SHOW_BALANCES", "true"), True
         ),
-        # persistência / snapshot (mantidos por compatibilidade)
+        # persistÃªncia / snapshot (mantidos por compatibilidade)
         "api_snapshot_path": gsect.get(
             "API_SNAPSHOT_PATH", "./data/api_snapshot.json"
         ),
@@ -556,8 +669,8 @@ def get_config() -> Dict[str, Any]:
             "cancel_list_max": _safe_int(b.get("CANCEL_LIST_MAX", "60"), 60),
         }
 
-    # CORREÇÃO CRÍTICA: Parâmetros de rede lidos com fallback GLOBAL → BOOT
-    # Mantém compatibilidade com configurações antigas e novas
+    # CORREÃ‡ÃƒO CRÃTICA: ParÃ¢metros de rede lidos com fallback GLOBAL â†’ BOOT
+    # MantÃ©m compatibilidade com configuraÃ§Ãµes antigas e novas
     boot["http_timeout_sec"] = _get_param_with_fallback(
         cfg, "HTTP_TIMEOUT_SEC", 15,
         fallback_sections=["BOOT"],
@@ -572,9 +685,9 @@ def get_config() -> Dict[str, Any]:
         fallback_sections=["BOOT"]
     )
 
-    # Log dos parâmetros carregados
+    # Log dos parÃ¢metros carregados
     logger.info(
-        f"[API] Parâmetros de rede carregados: "
+        f"[API] ParÃ¢metros de rede carregados: "
         f"HTTP_TIMEOUT_SEC={boot['http_timeout_sec']}s, "
         f"MAX_RETRIES={boot['max_retries']}, "
         f"RETRY_BACKOFF_MS={boot['retry_backoff_ms']}ms"
@@ -649,11 +762,11 @@ def get_config() -> Dict[str, Any]:
             ),
         }
 
-    # --- STAKE / SPREAD (raw, por seção) ---
+    # --- STAKE / SPREAD (raw, por seÃ§Ã£o) ---
     stake = dict(cfg["STAKE"]) if cfg.has_section("STAKE") else {}
     spread = dict(cfg["SPREAD"]) if cfg.has_section("SPREAD") else {}
 
-    # Retorno com campos antigos (para não quebrar o front atual)
+    # Retorno com campos antigos (para nÃ£o quebrar o front atual)
     # + objetos organizados para o novo painel.
     return {
         # legacy / simples
@@ -676,8 +789,8 @@ def get_config() -> Dict[str, Any]:
 
 def update_config(payload: dict):
     """
-    Atualiza parâmetros no config.
-    - Mantém suporte aos campos planos usados pelo front atual
+    Atualiza parÃ¢metros no config.
+    - MantÃ©m suporte aos campos planos usados pelo front atual
       (mode, usdt_brl_rate, ref_price, loop_interval_ms, print_every_sec, stake, spread)
     - Suporta, adicionalmente, objetos agrupados:
         payload["global"], payload["boot"], payload["log"],
@@ -728,7 +841,7 @@ def update_config(payload: dict):
             if key_json in gg:
                 g[key_ini] = "true" if _safe_bool(gg[key_json]) else "false"
 
-        # persistência / snapshot
+        # persistÃªncia / snapshot
         if "api_snapshot_path" in gg:
             g["API_SNAPSHOT_PATH"] = str(gg["api_snapshot_path"])
         if "sqlite_path" in gg:
@@ -770,8 +883,8 @@ def update_config(payload: dict):
         _set_bool("CANCEL_LIST_DETAILS", "cancel_list_details")
         _set_any("CANCEL_LIST_MAX", "cancel_list_max")
 
-        # CORREÇÃO CRÍTICA: Parâmetros de rede vão para GLOBAL, não BOOT
-        # Isso resolve a inconsistência BOOT vs GLOBAL
+        # CORREÃ‡ÃƒO CRÃTICA: ParÃ¢metros de rede vÃ£o para GLOBAL, nÃ£o BOOT
+        # Isso resolve a inconsistÃªncia BOOT vs GLOBAL
         if "http_timeout_sec" in bb:
             cfg["GLOBAL"]["HTTP_TIMEOUT_SEC"] = str(bb["http_timeout_sec"])
         if "max_retries" in bb:
@@ -861,15 +974,471 @@ def update_config(payload: dict):
     with open(config_path, "w", encoding="utf-8") as f:
         cfg.write(f)
 
-    logger.info("[API] Configuração atualizada e gravada em %s", config_path)
-    return True, "Configuração atualizada com sucesso."
+    logger.info("[API] ConfiguraÃ§Ã£o atualizada e gravada em %s", config_path)
+    return True, "ConfiguraÃ§Ã£o atualizada com sucesso."
 
 
-# ================== SNAPSHOT DO BOT (em memória/arquivo) ==================
+def get_pairs_catalog(tenant_id: str = "default") -> Dict[str, Any]:
+    cfg = _load_config()
+    sqlite_path = _resolve_sqlite_path(cfg)
+
+    configured_exchanges: Set[str] = set()
+    exchange_meta: Dict[str, Dict[str, Any]] = {}
+    for section in cfg.sections():
+        if not section.upper().startswith("EXCHANGES."):
+            continue
+        ex_name = section.split(".", 1)[1].strip().lower()
+        if not ex_name:
+            continue
+        configured_exchanges.add(ex_name)
+        exchange_meta[ex_name] = {
+            "exchange": ex_name,
+            "enabled": bool(cfg.getboolean(section, "ENABLED", fallback=False)),
+            "configured": True,
+        }
+
+    pair_sources: Dict[str, Set[str]] = {}
+    pair_exchange_symbols: Dict[str, Dict[str, Dict[str, str]]] = {}
+    local_assets: Set[str] = set()
+
+    def _register_pair(raw_pair: str, source: str) -> str:
+        normalized = _normalize_pair_token(raw_pair)
+        if not normalized:
+            return ""
+        base, quote = _split_pair_token(normalized)
+        if not base or not quote:
+            return ""
+        canonical = f"{base}/{quote}"
+        pair_sources.setdefault(canonical, set()).add(str(source))
+        return canonical
+
+    raw_pairs = cfg.get("PAIRS", "LIST", fallback="")
+    for token in str(raw_pairs or "").split(","):
+        _register_pair(token, "PAIRS")
+
+    if cfg.has_section("SYMBOLS"):
+        for key, value in cfg.items("SYMBOLS"):
+            key_norm = str(key or "").strip().lower()
+            if "." not in key_norm:
+                continue
+            ex_name, rest = key_norm.split(".", 1)
+            ex_name = ex_name.strip().lower()
+            if not ex_name:
+                continue
+            if ex_name not in exchange_meta:
+                exchange_meta[ex_name] = {
+                    "exchange": ex_name,
+                    "enabled": False,
+                    "configured": ex_name in configured_exchanges,
+                }
+
+            side = ""
+            pair_raw = ""
+            if rest.endswith(".buy"):
+                side = "BUY"
+                pair_raw = rest[:-4]
+            elif rest.endswith(".sell"):
+                side = "SELL"
+                pair_raw = rest[:-5]
+            else:
+                continue
+
+            pair = _register_pair(pair_raw, "SYMBOLS")
+            if not pair:
+                continue
+
+            local_symbol = str(value or "").strip().upper()
+            normalized_local = _normalize_pair_token(local_symbol)
+            if normalized_local:
+                local_symbol = normalized_local
+
+            pair_exchange_symbols.setdefault(pair, {}).setdefault(ex_name, {})[side] = local_symbol
+
+            local_base, local_quote = _split_pair_token(local_symbol)
+            if local_base:
+                local_assets.add(local_base)
+            if local_quote:
+                local_assets.add(local_quote)
+
+    for db_symbol in _load_db_pairs(sqlite_path):
+        _register_pair(db_symbol, "CONFIG_PAIRS")
+
+    all_pairs = sorted(pair_sources.keys())
+    global_bases: Set[str] = set()
+    global_quotes: Set[str] = set()
+
+    exchange_pair_count: Dict[str, int] = {ex: 0 for ex in exchange_meta.keys()}
+    exchange_mapped_count: Dict[str, int] = {ex: 0 for ex in exchange_meta.keys()}
+    exchange_quotes: Dict[str, Set[str]] = {ex: set() for ex in exchange_meta.keys()}
+
+    pair_items: List[Dict[str, Any]] = []
+    for pair in all_pairs:
+        base, quote = _split_pair_token(pair)
+        if base:
+            global_bases.add(base)
+        if quote:
+            global_quotes.add(quote)
+
+        pair_exchanges: List[Dict[str, Any]] = []
+        per_pair_map = pair_exchange_symbols.get(pair, {})
+        for ex_name in sorted(exchange_meta.keys()):
+            side_map = per_pair_map.get(ex_name, {})
+            mapped = bool(side_map)
+            buy_symbol = str(side_map.get("BUY") or pair)
+            sell_symbol = str(side_map.get("SELL") or buy_symbol or pair)
+
+            local_base, local_quote = _split_pair_token(buy_symbol)
+            if not local_base or not local_quote:
+                local_base, local_quote = _split_pair_token(sell_symbol)
+            if local_base:
+                local_assets.add(local_base)
+            if local_quote:
+                local_assets.add(local_quote)
+
+            pair_exchanges.append(
+                {
+                    "exchange": ex_name,
+                    "enabled": bool(exchange_meta[ex_name]["enabled"]),
+                    "mapped": mapped,
+                    "buy_symbol": buy_symbol,
+                    "sell_symbol": sell_symbol,
+                    "local_base": local_base,
+                    "local_quote": local_quote,
+                }
+            )
+
+            exchange_pair_count[ex_name] = int(exchange_pair_count.get(ex_name, 0)) + 1
+            if mapped:
+                exchange_mapped_count[ex_name] = int(exchange_mapped_count.get(ex_name, 0)) + 1
+            if local_quote:
+                exchange_quotes.setdefault(ex_name, set()).add(local_quote)
+
+        pair_items.append(
+            {
+                "pair": pair,
+                "base": base,
+                "quote": quote,
+                "sources": sorted(pair_sources.get(pair, set())),
+                "exchange_count": len(pair_exchanges),
+                "mapped_exchange_count": sum(1 for item in pair_exchanges if item.get("mapped")),
+                "exchanges": pair_exchanges,
+            }
+        )
+
+    exchange_items: List[Dict[str, Any]] = []
+    for ex_name in sorted(exchange_meta.keys()):
+        exchange_items.append(
+            {
+                "exchange": ex_name,
+                "enabled": bool(exchange_meta[ex_name]["enabled"]),
+                "configured": bool(exchange_meta[ex_name]["configured"]),
+                "pair_count": int(exchange_pair_count.get(ex_name, 0)),
+                "mapped_pair_count": int(exchange_mapped_count.get(ex_name, 0)),
+                "quotes": sorted(exchange_quotes.get(ex_name, set())),
+            }
+        )
+
+    return {
+        "tenant_id": str(tenant_id or "default"),
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "sqlite_path": sqlite_path,
+        "counts": {
+            "pairs": len(pair_items),
+            "exchanges": len(exchange_items),
+            "assets_global_base": len(global_bases),
+            "assets_global_quote": len(global_quotes),
+            "assets_local": len(local_assets),
+        },
+        "assets": {
+            "global_base": sorted(global_bases),
+            "global_quote": sorted(global_quotes),
+            "local": sorted(local_assets),
+        },
+        "pairs": pair_items,
+        "exchanges": exchange_items,
+    }
+
+
+# ================== SNAPSHOT DO BOT (em memÃ³ria/arquivo) ==================
 
 
 
 
+
+
+def _ensure_assets_pairs_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assets_registry (
+            tenant_id TEXT NOT NULL,
+            asset TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'BOTH',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (tenant_id, asset)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pair_mappings (
+            tenant_id TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            exchange TEXT NOT NULL,
+            buy_symbol TEXT NOT NULL,
+            sell_symbol TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (tenant_id, pair, exchange)
+        )
+        """
+    )
+
+
+def _sync_pairs_symbols_to_config(conn: sqlite3.Connection, tenant_id: str) -> None:
+    rows = conn.execute(
+        """
+        SELECT pair, exchange, buy_symbol, sell_symbol, enabled
+        FROM pair_mappings
+        WHERE tenant_id = ?
+        ORDER BY pair, exchange
+        """,
+        (str(tenant_id or "default"),),
+    ).fetchall()
+
+    cfg = _load_config()
+    if not cfg.has_section("PAIRS"):
+        cfg.add_section("PAIRS")
+    if not cfg.has_section("SYMBOLS"):
+        cfg.add_section("SYMBOLS")
+
+    pairs_set: Set[str] = set()
+    valid_symbol_keys: Set[str] = set()
+    exchanges_in_db: Set[str] = set()
+
+    for row in rows:
+        if not bool(int(row["enabled"] or 0)):
+            continue
+        pair = _normalize_pair_token(str(row["pair"] or ""))
+        ex = str(row["exchange"] or "").strip().lower()
+        buy_symbol = _normalize_pair_token(str(row["buy_symbol"] or ""))
+        sell_symbol = _normalize_pair_token(str(row["sell_symbol"] or ""))
+        if not pair or not ex or not buy_symbol or not sell_symbol:
+            continue
+        exchanges_in_db.add(ex)
+        pair_l = pair.lower()
+        pairs_set.add(pair)
+        key_buy = f"{ex}.{pair_l}.buy"
+        key_sell = f"{ex}.{pair_l}.sell"
+        cfg["SYMBOLS"][key_buy] = buy_symbol
+        cfg["SYMBOLS"][key_sell] = sell_symbol
+        valid_symbol_keys.add(key_buy)
+        valid_symbol_keys.add(key_sell)
+
+    current_pairs = []
+    for token in str(cfg.get("PAIRS", "LIST", fallback="") or "").split(","):
+        p = _normalize_pair_token(token)
+        if p:
+            current_pairs.append(p)
+    for p in current_pairs:
+        pairs_set.add(p)
+    cfg["PAIRS"]["LIST"] = ",".join(sorted(pairs_set))
+
+    symbol_keys = [k for k, _ in cfg.items("SYMBOLS")]
+    for key in symbol_keys:
+        low = str(key or "").strip().lower()
+        if low.count(".") >= 2 and (low.endswith(".buy") or low.endswith(".sell")):
+            ex = low.split(".", 1)[0]
+            if ex in exchanges_in_db and low not in valid_symbol_keys:
+                cfg.remove_option("SYMBOLS", key)
+
+    config_path = _resolve_writable_config_path()
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        cfg.write(f)
+
+
+def get_assets_pairs(tenant_id: str = "default") -> Dict[str, Any]:
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = _sqlite_connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_assets_pairs_schema(conn)
+        assets_rows = conn.execute(
+            """
+            SELECT tenant_id, asset, kind, enabled, notes, updated_at
+            FROM assets_registry
+            WHERE tenant_id = ?
+            ORDER BY asset
+            """,
+            (str(tenant_id or "default"),),
+        ).fetchall()
+        pair_rows = conn.execute(
+            """
+            SELECT tenant_id, pair, exchange, buy_symbol, sell_symbol, enabled, updated_at
+            FROM pair_mappings
+            WHERE tenant_id = ?
+            ORDER BY pair, exchange
+            """,
+            (str(tenant_id or "default"),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return {
+        "tenant_id": str(tenant_id or "default"),
+        "assets": [dict(r) for r in assets_rows],
+        "pairs": [dict(r) for r in pair_rows],
+        "count_assets": len(assets_rows),
+        "count_pairs": len(pair_rows),
+    }
+
+
+def upsert_asset(payload: Dict[str, Any], tenant_id: str = "default") -> Tuple[bool, str]:
+    asset = str(payload.get("asset") or "").strip().upper()
+    kind = str(payload.get("kind") or "BOTH").strip().upper()
+    enabled = 1 if _safe_bool(payload.get("enabled"), True) else 0
+    notes = str(payload.get("notes") or "").strip()
+    if not asset:
+        return False, "Campo 'asset' e obrigatorio."
+    if kind not in ("BASE", "QUOTE", "BOTH"):
+        return False, "Campo 'kind' invalido. Use BASE, QUOTE ou BOTH."
+
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = _sqlite_connect(db_path)
+    try:
+        _ensure_assets_pairs_schema(conn)
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        conn.execute(
+            """
+            INSERT INTO assets_registry (tenant_id, asset, kind, enabled, notes, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, asset) DO UPDATE SET
+                kind=excluded.kind,
+                enabled=excluded.enabled,
+                notes=excluded.notes,
+                updated_at=excluded.updated_at
+            """,
+            (str(tenant_id or "default"), asset, kind, enabled, notes, now_iso),
+        )
+        conn.commit()
+    except Exception as exc:
+        return False, f"Falha ao salvar moeda: {exc}"
+    finally:
+        conn.close()
+    return True, "Moeda salva com sucesso."
+
+
+def delete_asset(asset: str, tenant_id: str = "default") -> Tuple[bool, str]:
+    target = str(asset or "").strip().upper()
+    if not target:
+        return False, "Campo 'asset' e obrigatorio."
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return True, "Moeda removida."
+    conn = _sqlite_connect(db_path)
+    try:
+        _ensure_assets_pairs_schema(conn)
+        conn.execute(
+            "DELETE FROM assets_registry WHERE tenant_id = ? AND asset = ?",
+            (str(tenant_id or "default"), target),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return True, "Moeda removida."
+
+
+def upsert_pair_mapping(payload: Dict[str, Any], tenant_id: str = "default") -> Tuple[bool, str]:
+    pair = _normalize_pair_token(str(payload.get("pair") or ""))
+    exchange = str(payload.get("exchange") or "").strip().lower()
+    buy_symbol = _normalize_pair_token(str(payload.get("buy_symbol") or ""))
+    sell_symbol = _normalize_pair_token(str(payload.get("sell_symbol") or ""))
+    enabled = 1 if _safe_bool(payload.get("enabled"), True) else 0
+    if not pair:
+        return False, "Campo 'pair' e obrigatorio."
+    if not exchange:
+        return False, "Campo 'exchange' e obrigatorio."
+    if not buy_symbol or not sell_symbol:
+        return False, "Campos 'buy_symbol' e 'sell_symbol' sao obrigatorios."
+
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = _sqlite_connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_assets_pairs_schema(conn)
+        now_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        conn.execute(
+            """
+            INSERT INTO pair_mappings (tenant_id, pair, exchange, buy_symbol, sell_symbol, enabled, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, pair, exchange) DO UPDATE SET
+                buy_symbol=excluded.buy_symbol,
+                sell_symbol=excluded.sell_symbol,
+                enabled=excluded.enabled,
+                updated_at=excluded.updated_at
+            """,
+            (str(tenant_id or "default"), pair, exchange, buy_symbol, sell_symbol, enabled, now_iso),
+        )
+
+        for token, kind in ((pair, "BOTH"), (buy_symbol, "BOTH"), (sell_symbol, "BOTH")):
+            base, quote = _split_pair_token(token)
+            for asset in (base, quote):
+                if asset:
+                    conn.execute(
+                        """
+                        INSERT INTO assets_registry (tenant_id, asset, kind, enabled, notes, updated_at)
+                        VALUES (?, ?, ?, 1, '', ?)
+                        ON CONFLICT(tenant_id, asset) DO UPDATE SET
+                            updated_at=excluded.updated_at
+                        """,
+                        (str(tenant_id or "default"), asset, kind, now_iso),
+                    )
+
+        _sync_pairs_symbols_to_config(conn, tenant_id=tenant_id)
+        conn.commit()
+    except Exception as exc:
+        return False, f"Falha ao salvar par/mapeamento: {exc}"
+    finally:
+        conn.close()
+    return True, "Par salvo e sincronizado com config."
+
+
+def delete_pair_mapping(pair: str, exchange: str, tenant_id: str = "default") -> Tuple[bool, str]:
+    pair_norm = _normalize_pair_token(str(pair or ""))
+    ex = str(exchange or "").strip().lower()
+    if not pair_norm or not ex:
+        return False, "Campos 'pair' e 'exchange' sao obrigatorios."
+    cfg = _load_config()
+    db_path = _resolve_sqlite_path(cfg)
+    if not os.path.exists(db_path):
+        return True, "Mapeamento removido."
+    conn = _sqlite_connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_assets_pairs_schema(conn)
+        conn.execute(
+            """
+            DELETE FROM pair_mappings
+            WHERE tenant_id = ? AND pair = ? AND exchange = ?
+            """,
+            (str(tenant_id or "default"), pair_norm, ex),
+        )
+        _sync_pairs_symbols_to_config(conn, tenant_id=tenant_id)
+        conn.commit()
+    except Exception as exc:
+        return False, f"Falha ao remover mapeamento: {exc}"
+    finally:
+        conn.close()
+    return True, "Mapeamento removido."
 
 
 def _ensure_config_pairs_risk_columns(conn: sqlite3.Connection) -> None:
@@ -927,7 +1496,7 @@ def get_bot_configs() -> Dict[str, Any]:
     if not os.path.exists(db_path):
         return {"items": [], "sqlite_path": db_path}
 
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -975,7 +1544,7 @@ def upsert_bot_config(payload: Dict[str, Any]):
     """Cria/atualiza bot_config por par em config_pairs."""
     pair = str(payload.get("pair") or payload.get("symbol") or "").strip().upper().replace("-", "/")
     if not pair:
-        return False, "Campo 'pair' é obrigatório."
+        return False, "Campo 'pair' Ã© obrigatÃ³rio."
 
     strategy = str(payload.get("strategy") or "StrategySpread").strip() or "StrategySpread"
     risk_percentage = _safe_float(payload.get("risk_percentage"), 0.0)
@@ -992,7 +1561,7 @@ def upsert_bot_config(payload: Dict[str, Any]):
     db_path = _resolve_sqlite_path(cfg)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     try:
         _ensure_config_pairs_risk_columns(conn)
         conn.execute(
@@ -1062,7 +1631,7 @@ def get_risk_events(tenant_id: str = "default", symbol: str = "", limit: int = 5
     db_path = _resolve_sqlite_path(cfg)
     if not os.path.exists(db_path):
         return {"items": []}
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -1103,7 +1672,7 @@ def get_arbitrage_config(pair: str, tenant_id: str = "default") -> Dict[str, Any
     db_path = _resolve_sqlite_path(cfg)
     if not os.path.exists(db_path):
         return {"item": {}}
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -1143,12 +1712,12 @@ def get_arbitrage_config(pair: str, tenant_id: str = "default") -> Dict[str, Any
 def upsert_arbitrage_config(payload: Dict[str, Any], tenant_id: str = "default"):
     pair = str(payload.get("pair") or payload.get("symbol") or "").strip().upper().replace("-", "/")
     if not pair:
-        return False, "Campo 'pair' é obrigatório."
+        return False, "Campo 'pair' Ã© obrigatÃ³rio."
 
     cfg = _load_config()
     db_path = _resolve_sqlite_path(cfg)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     try:
         conn.execute(
             """
@@ -1224,7 +1793,7 @@ def get_arbitrage_status(pair: str, tenant_id: str = "default") -> Dict[str, Any
     db_path = _resolve_sqlite_path(cfg)
     if not os.path.exists(db_path):
         return {"item": {}}
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -1266,7 +1835,7 @@ def get_bot_global_config() -> Dict[str, Any]:
     cfg = _load_config()
     db_path = _resolve_sqlite_path(cfg)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -1324,7 +1893,7 @@ def upsert_bot_global_config(payload: Dict[str, Any]):
     max_daily_loss = max(0.0, _safe_float(payload.get("max_daily_loss"), current["max_daily_loss"]))
 
     db_path = current.get("sqlite_path") or get_effective_db_path()
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     try:
         conn.execute(
             """
@@ -1367,7 +1936,7 @@ def get_db_health() -> Dict[str, Any]:
     write_ok = False
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = _sqlite_connect(db_path)
         conn.row_factory = sqlite3.Row
         connect_ok = True
         _ensure_runtime_status_schema(conn)
@@ -1414,7 +1983,7 @@ def get_worker_health(stale_after_sec: int = 30) -> Dict[str, Any]:
         return result
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = _sqlite_connect(db_path)
         conn.row_factory = sqlite3.Row
         _ensure_runtime_status_schema(conn)
         row = conn.execute(
@@ -1471,7 +2040,7 @@ def get_config_status(stale_after_sec: int = 30) -> Dict[str, Any]:
     }
     if not os.path.exists(db_path):
         return out
-    conn = sqlite3.connect(db_path)
+    conn = _sqlite_connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         _ensure_config_pairs_risk_columns(conn)
@@ -1523,7 +2092,7 @@ def get_go_live_checklist(tenant_id: str) -> Dict[str, Any]:
     alerts_ok = False
 
     if os.path.exists(db_path):
-        conn = sqlite3.connect(db_path)
+        conn = _sqlite_connect(db_path)
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute("SELECT COUNT(*) AS c FROM exchange_credentials WHERE tenant_id = ? AND status = 'ACTIVE'", (tenant_id,)).fetchone()
@@ -1568,8 +2137,8 @@ def get_go_live_checklist(tenant_id: str) -> Dict[str, Any]:
     return {
         "tenantId": tenant_id,
         "items": [
-            {"key": "credentials_valid", "label": "Credenciais válidas", "ok": bool(credentials_ok), "link": "#/settings/exchanges"},
-            {"key": "withdraw_disabled", "label": "Withdraw desabilitado (aviso)", "ok": False, "warning": "Não verificável automaticamente por API CCXT padrão", "link": "#/settings/exchanges"},
+            {"key": "credentials_valid", "label": "Credenciais vÃ¡lidas", "ok": bool(credentials_ok), "link": "#/settings/exchanges"},
+            {"key": "withdraw_disabled", "label": "Withdraw desabilitado (aviso)", "ok": False, "warning": "NÃ£o verificÃ¡vel automaticamente por API CCXT padrÃ£o", "link": "#/settings/exchanges"},
             {"key": "risk_limits", "label": "Risk limits configurados", "ok": bool(risk_limits_ok), "link": "#/bot-config"},
             {"key": "kill_switch_tested", "label": "Kill switch testado", "ok": bool(kill_switch_tested), "link": "#/bot-config"},
             {"key": "ws_or_fallback", "label": "WS ativo (ou fallback funcionando)", "ok": bool(ws_ok), "link": "#/dashboard"},
@@ -1600,7 +2169,7 @@ def get_marketdata_orderbook_status(tenant_id: str, exchange: str = "", symbol: 
 
 def debug_snapshot() -> Dict[str, Any]:
     """
-    Endpoint de debug para inspecionar rapidamente o snapshot em memória/arquivo.
+    Endpoint de debug para inspecionar rapidamente o snapshot em memÃ³ria/arquivo.
     """
     snap = _load_snapshot()
 
@@ -1645,7 +2214,7 @@ def debug_snapshot() -> Dict[str, Any]:
 
 def get_balances() -> Dict[str, Any]:
     """
-    Lê os saldos do snapshot do bot (em memória/arquivo).
+    LÃª os saldos do snapshot do bot (em memÃ³ria/arquivo).
     Estrutura retornada pelo endpoint:
     {
         "mercadobitcoin": {
@@ -1669,16 +2238,16 @@ def get_balances() -> Dict[str, Any]:
 
 def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Retorna ordens a partir do snapshot em memória/arquivo.
+    Retorna ordens a partir do snapshot em memÃ³ria/arquivo.
 
-    Suporta múltiplos formatos de snapshot:
+    Suporta mÃºltiplos formatos de snapshot:
 
     1) "orders": { "pending": [...], "open": [...], "closed": [...] }
        (formato atual do seu api_snapshot.json)
     2) "orders": [ { "state": "pending", ... }, ... ]
     3) "orders": [ { "status": "open"/"filled"/"cancelled", ... }, ... ]  (legacy)
 
-    Em todos os casos, o retorno é:
+    Em todos os casos, o retorno Ã©:
     {
         "orders": [ { "id": "...", "exchange": "...", ... }, ... ]
     }
@@ -1696,9 +2265,9 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
         open_list = raw.get("open") or []
         closed_list = raw.get("closed") or []
 
-        # No SEU domínio:
-        #  - tudo que está "no book" é ORDEM PENDENTE
-        #  - ou seja: pending + open do snapshot vão para o estado "pending" da API
+        # No SEU domÃ­nio:
+        #  - tudo que estÃ¡ "no book" Ã© ORDEM PENDENTE
+        #  - ou seja: pending + open do snapshot vÃ£o para o estado "pending" da API
         if state == "pending":
             orders_list = []
             if isinstance(pending_list, list):
@@ -1707,8 +2276,8 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
                 orders_list.extend(open_list)
 
         elif state == "open":
-            # Ainda não temos no snapshot as "ordens executadas" (posições abertas).
-            # Mantemos vazio até ligarmos isso no portfolio/order_manager/state.
+            # Ainda nÃ£o temos no snapshot as "ordens executadas" (posiÃ§Ãµes abertas).
+            # Mantemos vazio atÃ© ligarmos isso no portfolio/order_manager/state.
             orders_list = []
 
         elif state == "closed":
@@ -1723,7 +2292,7 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
                     tmp.extend(v)
             orders_list = tmp
 
-    # -------- formato 2 / 3: lista única --------
+    # -------- formato 2 / 3: lista Ãºnica --------
     elif isinstance(raw, list):
         # Se existir campo "state", usa diretamente
         if any(isinstance(o, dict) and "state" in o for o in raw):
@@ -1734,12 +2303,12 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
                 and str(o.get("state", "")).lower() == state
             ]
         else:
-            # Fallback por STATUS (lógica antiga)
+            # Fallback por STATUS (lÃ³gica antiga)
             def norm_status(o: Dict[str, Any]) -> str:
                 return str(o.get("status", "")).lower()
 
             if state == "pending":
-                # PENDENTE = ordem viva no book (ou recém criada)
+                # PENDENTE = ordem viva no book (ou recÃ©m criada)
                 pending_status = {
                     "pending",
                     "new",
@@ -1750,8 +2319,8 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
                 }
                 orders_list = [o for o in raw if norm_status(o) in pending_status]
             elif state == "open":
-                # "open" aqui ficaria reservado para quando você passar a registrar
-                # ordens executadas/posições no snapshot.
+                # "open" aqui ficaria reservado para quando vocÃª passar a registrar
+                # ordens executadas/posiÃ§Ãµes no snapshot.
                 orders_list = []
             elif state == "closed":
                 closed_status = {
@@ -1769,7 +2338,7 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
                 orders_list = list(raw)
 
     else:
-        # formato inesperado – devolve vazio
+        # formato inesperado â€“ devolve vazio
         orders_list = []
 
     logger.info(
@@ -1787,14 +2356,14 @@ def get_orders(state: str) -> Dict[str, List[Dict[str, Any]]]:
 
 def get_mids(pair: str) -> Dict[str, Any]:
     """
-    Retorna mids por corretora para um par, a partir do snapshot em memória/arquivo.
+    Retorna mids por corretora para um par, a partir do snapshot em memÃ³ria/arquivo.
 
-    Suporta múltiplos formatos de snapshot:
+    Suporta mÃºltiplos formatos de snapshot:
 
     1) "mids": { "SOL-USDT": { "gate": 123.4, "mexc": 123.5 }, "BTC-USDT": {...} }
-    2) "mids": { "gate": 123.4, "mexc": 123.5 }   # já é o dict por corretora
+    2) "mids": { "gate": 123.4, "mexc": 123.5 }   # jÃ¡ Ã© o dict por corretora
 
-    O retorno é sempre:
+    O retorno Ã© sempre:
     {
         "pair": "SOL-USDT",
         "mids": {
@@ -1809,14 +2378,14 @@ def get_mids(pair: str) -> Dict[str, Any]:
 
     mids_pair: Dict[str, Any] = {}
 
-    # Caso 1: dict por par (valores também são dicts)
+    # Caso 1: dict por par (valores tambÃ©m sÃ£o dicts)
     if isinstance(mids_root, dict) and any(
         isinstance(v, dict) for v in mids_root.values()
     ):
         # primeiro tenta chave exatamente igual
         mids_pair = mids_root.get(pair_norm, {}) or {}
 
-        # se não achar, normaliza SOL/USDT x SOL-USDT
+        # se nÃ£o achar, normaliza SOL/USDT x SOL-USDT
         if not mids_pair:
             for k, v in mids_root.items():
                 if not isinstance(v, dict):
@@ -1825,7 +2394,7 @@ def get_mids(pair: str) -> Dict[str, Any]:
                     mids_pair = v
                     break
     else:
-        # Caso 2: já veio como { exchange: price }
+        # Caso 2: jÃ¡ veio como { exchange: price }
         mids_pair = mids_root
 
     logger.info(
@@ -1846,7 +2415,7 @@ def get_events(limit: int = 50) -> Dict[str, Any]:
     que o monitor envia para o painel.
 
     Espera que o snapshot tenha a chave 'events' como lista de strings,
-    mas é tolerante com outros formatos.
+    mas Ã© tolerante com outros formatos.
     """
     snap = _load_snapshot()
     raw_events = snap.get("events") or []
@@ -1869,3 +2438,4 @@ def get_events(limit: int = 50) -> Dict[str, Any]:
     )
 
     return {"events": events_out}
+

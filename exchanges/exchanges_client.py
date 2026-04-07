@@ -5,10 +5,14 @@ from __future__ import annotations
 
 import asyncio
 import configparser
+import contextlib
+import os
+import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, List, Iterable, Set
 
+import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential_jitter
 
 import ccxt.async_support as ccxt
@@ -36,8 +40,17 @@ from core.exchange_client_manager import ExchangeClientFactory, ExchangeClientMa
 from core.exchange_circuit_breaker import ExchangeCircuitBreaker
 from core.metrics_service import MetricsService
 from core.notification_service import NotificationEventType, NotificationSeverity
+from app.pathing import get_work_dir
 
 log = get_logger("exchanges")
+
+# Windows + aiodns can fail with "Could not contact DNS servers" in some client envs.
+# Force threaded DNS resolver for aiohttp to stabilize CCXT async connectivity.
+if os.name == "nt":
+    with contextlib.suppress(Exception):
+        aiohttp.resolver.DefaultResolver = aiohttp.resolver.ThreadedResolver  # type: ignore[attr-defined]
+    with contextlib.suppress(Exception):
+        aiohttp.connector.DefaultResolver = aiohttp.resolver.ThreadedResolver  # type: ignore[attr-defined]
 
 # --------- Tipos ---------
 @dataclass
@@ -76,9 +89,13 @@ def _get_retry_deco(max_attempts: int, backoff_ms: int):
 
 def _ccxt_id_candidates(ex_name: str) -> List[str]:
     # Mantemos candidatos para lidar com variações históricas no CCXT
-    if ex_name.lower() == "mercadobitcoin":
-        return ["mercadobitcoin", "mercado"]
     low = ex_name.lower()
+    if low == "mercadobitcoin":
+        return ["mercadobitcoin", "mercado"]
+    if low in {"gate", "gateio"}:
+        return ["gate", "gateio"]
+    if low in {"mexc", "mexc3"}:
+        return ["mexc", "mexc3"]
     return [ALIASES_CCXT.get(low, low)]
 
 # --------- Classe ---------
@@ -136,6 +153,7 @@ class ExchangeHub:
             notification_service=self.notification_service,
         )
         self._markets_loaded: Dict[str, bool] = {}
+        self._unavailable_symbol_warned: Set[Tuple[str, str, str]] = set()
         self.symbol_map = self._build_symbol_map()
         self.market_data = None
         self.circuit_breaker = ExchangeCircuitBreaker(
@@ -211,14 +229,32 @@ class ExchangeHub:
     # ---------------- config
 
     def _discover_enabled(self) -> List[str]:
-        ids = []
+        ids: List[str] = []
         for sect in self.cfg.sections():
             if not sect.startswith("EXCHANGES."):
                 continue
             ex_name = sect.split(".", 1)[1]
             if self.cfg.getboolean(sect, "ENABLED", fallback=False):
                 ids.append(ex_name)
-        return ids
+        # Simplifica operação: exchanges com credencial ACTIVE e teste OK entram automaticamente.
+        try:
+            status_rows = self.credentials_service.list_exchange_status(self.tenant_id) or []
+            for row in status_rows:
+                status = str(getattr(row, "status", "") or "").upper()
+                last_ok = bool(getattr(row, "last_test_ok", False))
+                ex_name = str(getattr(row, "exchange", "") or "").strip().lower()
+                if status != "ACTIVE" or not last_ok or not ex_name:
+                    continue
+                if ex_name in {"gate"}:
+                    ex_name = "gateio"
+                if ex_name in {"mexc3"}:
+                    ex_name = "mexc"
+                if ex_name not in ids:
+                    ids.append(ex_name)
+        except Exception as exc:
+            log.debug("[ExchangeHub] falha ao incluir exchanges por credencial ativa: %s", exc)
+
+        return list(dict.fromkeys([str(x).strip().lower() for x in ids if str(x).strip()]))
 
     def _build_symbol_map(self) -> Dict[str, Dict[str, str]]:
         """
@@ -248,20 +284,148 @@ class ExchangeHub:
                 out[ex][f"{pair}.SELL"] = v
             elif rest in ("buy", "sell"):
                 out[ex][rest.upper()] = v
+
+        # Merge de pair_mappings do SQLite (fonte principal da UI).
+        # Isso evita divergência entre config ini e dados salvos no frontend.
+        for ex_name, overrides in self._load_symbol_overrides_from_db().items():
+            out.setdefault(ex_name, {})
+            out[ex_name].update(overrides)
+            if ex_name == "gateio":
+                out.setdefault("gate", {})
+                out["gate"].update(overrides)
+            if ex_name == "gate":
+                out.setdefault("gateio", {})
+                out["gateio"].update(overrides)
+        return out
+
+    def _load_symbol_overrides_from_db(self) -> Dict[str, Dict[str, str]]:
+        out: Dict[str, Dict[str, str]] = {}
+        sqlite_cfg = str(self.cfg.get("GLOBAL", "SQLITE_PATH", fallback="./data/state.db") or "./data/state.db").strip()
+        db_path = sqlite_cfg if os.path.isabs(sqlite_cfg) else os.path.normpath(os.path.join(str(get_work_dir()), sqlite_cfg))
+        if not os.path.exists(db_path):
+            return out
+
+        conn: Optional[sqlite3.Connection] = None
+        try:
+            conn = sqlite3.connect(db_path, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            has_table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND lower(name)=lower('pair_mappings') LIMIT 1"
+            ).fetchone()
+            if not has_table:
+                return out
+            rows = conn.execute(
+                """
+                SELECT pair, exchange, buy_symbol, sell_symbol, enabled
+                FROM pair_mappings
+                WHERE tenant_id = ?
+                ORDER BY pair, exchange
+                """,
+                (str(self.tenant_id or "default"),),
+            ).fetchall()
+            for row in rows:
+                if not bool(int((row["enabled"] if "enabled" in row.keys() else row[4]) or 0)):
+                    continue
+                pair = str((row["pair"] if "pair" in row.keys() else row[0]) or "").strip().upper()
+                exchange = str((row["exchange"] if "exchange" in row.keys() else row[1]) or "").strip().lower()
+                buy_symbol = str((row["buy_symbol"] if "buy_symbol" in row.keys() else row[2]) or "").strip()
+                sell_symbol = str((row["sell_symbol"] if "sell_symbol" in row.keys() else row[3]) or "").strip()
+                if not pair or not exchange:
+                    continue
+                out.setdefault(exchange, {})
+                if buy_symbol:
+                    out[exchange][f"{pair}.BUY"] = buy_symbol
+                if sell_symbol:
+                    out[exchange][f"{pair}.SELL"] = sell_symbol
+        except Exception as exc:
+            log.warning("[ExchangeHub] falha ao carregar pair_mappings do sqlite: %s", exc)
+        finally:
+            if conn is not None:
+                with contextlib.suppress(Exception):
+                    conn.close()
         return out
 
     def _pick_symbol(self, ex_name: str, side: str, global_pair: str) -> str:
         sideU = side.upper()
         ex = ex_name.lower()
         pairU = (global_pair or "").upper()
-        if ex in self.symbol_map:
-            m = self.symbol_map[ex]
+
+        map_keys = [ex]
+        alias = ALIASES_CCXT.get(ex)
+        if alias and alias not in map_keys:
+            map_keys.append(alias)
+        if ex == "gate" and "gateio" not in map_keys:
+            map_keys.append("gateio")
+        if ex == "mexc" and "mexc3" not in map_keys:
+            map_keys.append("mexc3")
+
+        for map_ex in map_keys:
+            if map_ex not in self.symbol_map:
+                continue
+            m = self.symbol_map[map_ex]
             if pairU and f"{pairU}.{sideU}" in m:
                 return m[f"{pairU}.{sideU}"]
             if sideU in m:
                 return m[sideU]
         # se nada mapeado, usa o próprio par informado
         return pairU or global_pair
+
+    @staticmethod
+    def _normalize_symbol_token(symbol_local: str) -> str:
+        return str(symbol_local or "").strip().upper()
+
+    def _is_symbol_listed(self, ex_name: str, symbol_local: str) -> bool:
+        """
+        Verifica se o símbolo existe nos mercados carregados da exchange.
+        Se os mercados ainda não foram carregados, não bloqueia (retorna True).
+        """
+        sym = self._normalize_symbol_token(symbol_local)
+        if not sym:
+            return False
+
+        ex = self.exchanges.get(str(ex_name or "").lower())
+        markets = getattr(ex, "markets", None) if ex is not None else None
+        if not isinstance(markets, dict) or not markets:
+            return True
+
+        market_keys = {self._normalize_symbol_token(k) for k in markets.keys()}
+        if sym in market_keys:
+            return True
+        if any(k.startswith(f"{sym}:") for k in market_keys):
+            return True
+
+        # fallback simples para símbolos sem "/" (ex.: BTCUSDT)
+        if "/" not in sym and len(sym) > 3:
+            for quote in ("USDT", "USD", "BRL", "BTC", "ETH"):
+                if sym.endswith(quote):
+                    base = sym[: -len(quote)]
+                    candidate = f"{base}/{quote}"
+                    if candidate in market_keys or any(k.startswith(f"{candidate}:") for k in market_keys):
+                        return True
+                    break
+        return False
+
+    def _resolve_symbol_local_checked(self, ex_name: str, side: str, global_pair: str) -> str:
+        symbol_local = self._pick_symbol(ex_name, side, global_pair)
+        if not symbol_local:
+            return ""
+        if self._is_symbol_listed(ex_name, symbol_local):
+            return symbol_local
+
+        key = (
+            str(ex_name or "").lower(),
+            self._normalize_symbol_token(symbol_local),
+            self._normalize_symbol_token(global_pair),
+        )
+        if key not in self._unavailable_symbol_warned:
+            self._unavailable_symbol_warned.add(key)
+            log.info(
+                "[%s] simbolo local '%s' nao listado para par '%s'; exchange sera ignorada para esse par.",
+                ex_name,
+                symbol_local,
+                global_pair,
+            )
+        return ""
 
     def _both_side_symbols(self, ex_name: str, global_pair: str) -> List[str]:
         """
@@ -586,7 +750,16 @@ class ExchangeHub:
     # ------------ probe com diagnóstico (público)
 
     async def probe_mid_usdt(self, ex_name: str, side: str, global_pair: str) -> Dict[str, Any]:
-        sym = self._pick_symbol(ex_name, side, global_pair)
+        sym = self._resolve_symbol_local_checked(ex_name, side, global_pair)
+        if not sym:
+            return {
+                "ex": ex_name,
+                "symbol_local": "",
+                "ok": False,
+                "mid_usdt": None,
+                "err": "not_listed",
+                "detail": "simbolo nao listado nesta exchange",
+            }
         try:
             mid = await self.get_mid_price_usdt(ex_name, sym)
             if mid is None:
@@ -938,19 +1111,25 @@ class ExchangeHub:
     # ---------------- atalhos públicos
 
     def resolve_symbol_local(self, ex_name: str, side: str, global_pair: str) -> str:
-        return self._pick_symbol(ex_name, side, global_pair)
+        return self._resolve_symbol_local_checked(ex_name, side, global_pair)
 
     async def get_quote_usdt(self, ex_name: str, side: str, global_pair: str) -> Quote:
-        symbol_local = self._pick_symbol(ex_name, side, global_pair)
+        symbol_local = self.resolve_symbol_local(ex_name, side, global_pair)
+        if not symbol_local:
+            return Quote(bid=None, ask=None, mid=None, raw_quote_ccy=_quote_ccy(global_pair))
         return await self.get_ticker(ex_name, symbol_local)
 
     async def get_best_bid_ask_usdt(self, ex_name: str, side: str, global_pair: str) -> Tuple[Optional[float], Optional[float]]:
-        symbol_local = self._pick_symbol(ex_name, side, global_pair)
+        symbol_local = self.resolve_symbol_local(ex_name, side, global_pair)
+        if not symbol_local:
+            return None, None
         q = await self.get_ticker(ex_name, symbol_local)
         bid_u = self.to_usdt(ex_name, symbol_local, q.bid) if q.bid is not None else None
         ask_u = self.to_usdt(ex_name, symbol_local, q.ask) if q.ask is not None else None
         return bid_u, ask_u
 
     async def get_mid_usdt(self, ex_name: str, side: str, global_pair: str) -> Optional[float]:
-        symbol_local = self._pick_symbol(ex_name, side, global_pair)
+        symbol_local = self.resolve_symbol_local(ex_name, side, global_pair)
+        if not symbol_local:
+            return None
         return await self.get_mid_price_usdt(ex_name, symbol_local)

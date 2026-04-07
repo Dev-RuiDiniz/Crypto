@@ -6,18 +6,9 @@ const React = window.React;
 const { useState, useEffect } = React;
 const e = React.createElement;
 
-const API_BASE = "http://127.0.0.1:8000/api";
-
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ao acessar ${url}`);
-  }
-  return await res.json();
-}
-
 export function Dashboard(props) {
   const refreshMs = props.refreshMs || 2000;
+  const { tenantId } = api.getAuthContext();
 
   const [balances, setBalances] = useState({});
   const [mids, setMids] = useState({});
@@ -55,14 +46,14 @@ export function Dashboard(props) {
           metricsJson,
           cfgStatusJson
         ] = await Promise.all([
-          fetchJson(`${API_BASE}/balances`),
-          fetchJson(`${API_BASE}/orders?state=pending`),
-          fetchJson(`${API_BASE}/orders?state=open`),
-          fetchJson(`${API_BASE}/orders?state=closed`),
-          fetchJson(`${API_BASE}/mids?pair=${encodeURIComponent(pair)}`),
-          fetchJson(`${API_BASE}/tenants/default/marketdata/orderbook-status`),
-          api.getMetrics("default"),
-          fetchJson(`${API_BASE}/config-status`)
+          api.getBalances(),
+          api.getOrders("pending"),
+          api.getOrders("open"),
+          api.getOrders("closed"),
+          api.getMids(pair),
+          api.getOrderbookStatus(tenantId || "default"),
+          api.getMetrics(tenantId || "default"),
+          api.getConfigStatus()
         ]);
 
         if (cancelled) return;
@@ -96,7 +87,7 @@ export function Dashboard(props) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [pair, refreshMs, hasLoadedOnce]);
+  }, [pair, refreshMs, hasLoadedOnce, tenantId]);
 
   // ====== helpers / métricas rápidas ======
 

@@ -64,9 +64,29 @@ class RiskPolicy:
             return self._block(tenant_id, exchange, symbol, "MAX_ABSOLUTE", max_abs, trade_value, "Valor absoluto por trade excedido", client_order_id)
 
         open_orders = [o for o in self.state.get_open_orders(limit=2000) if str(o.get("pair") or "").upper() == symbol.upper()]
-        max_open = int(pair_cfg.get("max_open_orders_per_symbol") or 0)
-        if max_open <= 0 and self.risk_manager is not None:
-            max_open = int(self.risk_manager.open_limit_for(symbol, side=side))
+        if client_order_id:
+            current_coid = str(client_order_id or "")
+            open_orders = [
+                o for o in open_orders
+                if (
+                    str(o.get("client_order_id") or "") != current_coid
+                    and current_coid not in str(o.get("id") or "")
+                )
+            ]
+        raw_max_open = pair_cfg.get("max_open_orders_per_symbol") if isinstance(pair_cfg, dict) else None
+        max_open = 0
+        if raw_max_open is None:
+            # Fallback para config legacy somente quando o par nao define o campo.
+            if self.risk_manager is not None:
+                max_open = int(self.risk_manager.open_limit_for(symbol, side=side))
+        else:
+            try:
+                max_open = int(raw_max_open)
+            except Exception:
+                try:
+                    max_open = int(float(raw_max_open))
+                except Exception:
+                    max_open = 0
         if max_open > 0 and len(open_orders) >= max_open:
             return self._block(tenant_id, exchange, symbol, "MAX_OPEN_ORDERS", max_open, len(open_orders), "Quantidade máxima de ordens abertas atingida", client_order_id)
 
