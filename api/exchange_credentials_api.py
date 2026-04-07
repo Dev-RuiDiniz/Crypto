@@ -189,6 +189,8 @@ def _classify_exchange_test_error(exc: Exception) -> tuple[str, str, Optional[st
     msg = str(exc).lower()
     if any(k in msg for k in ("timeout", "timed out", "network error", "connection")):
         return "EXCHANGE_TEST_TIMEOUT", "TIMEOUT", "check_internet_or_exchange_status"
+    if any(k in msg for k in ("tapi_method", "api deprecated", "versão que você está utilizando da nossa api está depreciada", "versao que voce esta utilizando da nossa api esta depreciada")):
+        return "EXCHANGE_API_DEPRECATED", "API_DEPRECATED", "use_mb_v4_credentials_flow_for_mercadobitcoin"
     if any(k in msg for k in ("recvwindow", "timestamp", "nonce", "timing")):
         return "EXCHANGE_TIMESTAMP_WINDOW", "TIMESTAMP_WINDOW", "sync_computer_clock_and_retry"
     if any(k in msg for k in ("no permission", "permission", "forbidden", "not allowed")):
@@ -299,6 +301,7 @@ def _build_failure_message(category: Optional[str], hint: Optional[str]) -> str:
         "TIMESTAMP_WINDOW": "Falha de timestamp (hora local fora da janela da exchange).",
         "TIMEOUT": "Timeout de comunicacao com a exchange durante validacao.",
         "TRADE_PROBE_UNAVAILABLE": "Nao foi possivel validar endpoint privado de ordens nesta exchange.",
+        "API_DEPRECATED": "A exchange rejeitou o fluxo legado de autenticacao/probe desta integracao.",
         "UNSUPPORTED_EXCHANGE": "Exchange nao suportada para validacao automatica.",
     }
     msg = base_map.get(str(category or "").upper(), "Falha ao validar credencial na exchange.")

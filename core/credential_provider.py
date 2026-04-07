@@ -9,6 +9,24 @@ from core.credentials_service import (
     CredentialsNotFoundError,
 )
 
+ALIASES = {
+    "gate": "gateio",
+    "gateio": "gate",
+    "mexc3": "mexc",
+    "mexc": "mexc3",
+}
+
+
+def _exchange_candidates(exchange: str) -> list[str]:
+    low = str(exchange or "").strip().lower()
+    if not low:
+        return []
+    out = [low]
+    alias = ALIASES.get(low)
+    if alias and alias not in out:
+        out.append(alias)
+    return out
+
 
 @dataclass
 class CredentialRecord:
@@ -26,7 +44,21 @@ class CredentialProvider:
         self.service = service
 
     def get_active_credential(self, tenant_id: str, exchange: str) -> CredentialRecord:
-        cred: ActiveExchangeCredential = self.service.get_active_credential(tenant_id, exchange)
+        last_err: Exception | None = None
+        cred: ActiveExchangeCredential | None = None
+        for candidate in _exchange_candidates(exchange):
+            try:
+                cred = self.service.get_active_credential(tenant_id, candidate)
+                break
+            except CredentialsNotFoundError as exc:
+                last_err = exc
+                continue
+        if cred is None:
+            if last_err is not None:
+                raise last_err
+            raise CredentialsNotFoundError(
+                f"No active credentials found for tenant='{tenant_id}' exchange='{exchange}'"
+            )
         status = (cred.status or "").upper()
         if status != "ACTIVE":
             raise CredentialsNotFoundError(
