@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import configparser
+import json
 import logging
 import time
 import uuid
 from typing import Any, Optional
+from urllib import error as urlerror
+from urllib import parse as urlparse
+from urllib import request as urlrequest
 
 import ccxt
 from flask import Blueprint, jsonify, request, g
@@ -189,6 +193,10 @@ def _classify_exchange_test_error(exc: Exception) -> tuple[str, str, Optional[st
     msg = str(exc).lower()
     if any(k in msg for k in ("timeout", "timed out", "network error", "connection")):
         return "EXCHANGE_TEST_TIMEOUT", "TIMEOUT", "check_internet_or_exchange_status"
+    if "mb_v4_oauth_failed" in msg and ("http=401" in msg or "http=403" in msg):
+        return "EXCHANGE_AUTH_FAILED", "AUTH_FAILED", "verify_api_key_secret_and_passphrase"
+    if "mb_v4_orders_probe_failed" in msg and ("http=401" in msg or "http=403" in msg):
+        return "EXCHANGE_PERMISSION_DENIED", "PERMISSION_DENIED", "enable_trade_and_orders_permission"
     if any(k in msg for k in ("tapi_method", "api deprecated", "versão que você está utilizando da nossa api está depreciada", "versao que voce esta utilizando da nossa api esta depreciada")):
         return "EXCHANGE_API_DEPRECATED", "API_DEPRECATED", "use_mb_v4_credentials_flow_for_mercadobitcoin"
     if any(k in msg for k in ("recvwindow", "timestamp", "nonce", "timing")):
@@ -310,6 +318,106 @@ def _build_failure_message(category: Optional[str], hint: Optional[str]) -> str:
     return msg
 
 
+def _http_json(
+    method: str,
+    url: str,
+    *,
+    headers: Optional[dict[str, str]] = None,
+    data: Optional[bytes] = None,
+    timeout_sec: int = 10,
+) -> tuple[int, Any]:
+    req = urlrequest.Request(url, data=data, method=method.upper())
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        with urlrequest.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read()
+            text = raw.decode("utf-8", errors="replace")
+            ctype = str(resp.headers.get("Content-Type", "")).lower()
+            if "application/json" in ctype:
+                try:
+                    return int(resp.status), json.loads(text)
+                except Exception:
+                    return int(resp.status), text
+            try:
+                return int(resp.status), json.loads(text)
+            except Exception:
+                return int(resp.status), text
+    except urlerror.HTTPError as exc:
+        raw = exc.read() if hasattr(exc, "read") else b""
+        text = raw.decode("utf-8", errors="replace")
+        try:
+            payload: Any = json.loads(text)
+        except Exception:
+            payload = text or str(exc)
+        return int(exc.code), payload
+
+
+def _test_mercadobitcoin_v4_connection(api_key: str, api_secret: str) -> dict[str, Any]:
+    token_url = "https://api.mercadobitcoin.net/api/v4/oauth2/token"
+    body = urlparse.urlencode(
+        {
+            "grant_type": "client_credentials",
+            "client_id": api_key,
+            "client_secret": api_secret,
+        }
+    ).encode("utf-8")
+    code, payload = _http_json(
+        "POST",
+        token_url,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
+        data=body,
+        timeout_sec=12,
+    )
+    if code != 200 or not isinstance(payload, dict) or not payload.get("access_token"):
+        raise RuntimeError(f"mb_v4_oauth_failed http={code} payload={payload}")
+
+    access_token = str(payload.get("access_token") or "").strip()
+    if not access_token:
+        raise RuntimeError("mb_v4_oauth_missing_access_token")
+
+    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    acc_code, accounts_payload = _http_json(
+        "GET",
+        "https://api.mercadobitcoin.net/api/v4/accounts",
+        headers=headers,
+        timeout_sec=12,
+    )
+    if acc_code != 200:
+        raise RuntimeError(f"mb_v4_accounts_failed http={acc_code} payload={accounts_payload}")
+
+    account_id = None
+    if isinstance(accounts_payload, list) and accounts_payload:
+        first = accounts_payload[0]
+        if isinstance(first, dict):
+            account_id = str(first.get("id") or first.get("accountId") or "").strip()
+    elif isinstance(accounts_payload, dict):
+        items = accounts_payload.get("accounts")
+        if isinstance(items, list) and items:
+            first = items[0]
+            if isinstance(first, dict):
+                account_id = str(first.get("id") or first.get("accountId") or "").strip()
+    if not account_id:
+        raise RuntimeError("mb_v4_no_account_id")
+
+    probe_url = (
+        f"https://api.mercadobitcoin.net/api/v4/accounts/{account_id}/orders"
+        "?status=working&limit=1"
+    )
+    ord_code, orders_payload = _http_json("GET", probe_url, headers=headers, timeout_sec=12)
+    if ord_code != 200:
+        raise RuntimeError(f"mb_v4_orders_probe_failed http={ord_code} payload={orders_payload}")
+
+    return {
+        "ok": True,
+        "probe_symbol": None,
+        "probe_method": "GET /accounts/{accountId}/orders?status=working&limit=1",
+    }
+
+
 def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, passphrase: Optional[str]) -> dict[str, Any]:
     started = time.time()
     client = None
@@ -325,6 +433,11 @@ def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, pass
         "error_message": None,
     }
     try:
+        if low in {"mercadobitcoin", "mercado"}:
+            mb_res = _test_mercadobitcoin_v4_connection(api_key, api_secret)
+            result.update(mb_res)
+            return result
+
         candidates = _exchange_candidates(low)
 
         for candidate in candidates:
