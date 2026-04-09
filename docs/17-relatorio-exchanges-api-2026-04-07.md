@@ -132,18 +132,22 @@ Mapeamento de simbolo:
 Como funciona no sistema:
 - Integracao por CCXT para privado e para fallback de market data.
 - Integracao WS dedicada para orderbook em `core/market_data.py`.
+- Hardening adicional documentado em `docs/19-mexc-hardening-2026-04-09.md`.
 
 Como enviamos dados para a exchange:
 - CCXT para ordens/saldo/cancelamento.
-- Ajuste de tempo/recvWindow aplicado para reduzir erros de timestamp:
-  - `recvWindow` elevado
-  - `load_time_difference()` quando suportado
+- Politica MEXC centralizada para reduzir erros de timestamp:
+  - `recvWindow=60000`
+  - referencia de horario em `GET /api/v3/time`
+  - telemetria de `timeDifferenceMs`, horario UTC e bucket por hora
+  - classificacao especifica para `TIMESTAMP_WINDOW`, `PERMISSION_DENIED`, `ACCOUNT_MODE_MISMATCH` e `IP_RESTRICTED`
 
 Como recebemos dados da exchange:
 - Preferencialmente WS:
   - `wss://wbs-api.mexc.com/ws`
   - canal `spot@public.limit.depth.v3.api.pb@<SYMBOL>@<DEPTH>`
   - mensagens binarias protobuf parseadas para `bids/asks`
+  - heartbeat ativo com ping a cada 20s
 - Se WS falhar/stale:
   - fallback automatico para polling via `fetch_order_book`
   - tentativa de reconexao WS apos janela configurada
