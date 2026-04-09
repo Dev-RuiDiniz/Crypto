@@ -96,6 +96,30 @@ def test_auth_error_classifier():
     assert category == "SIGNATURE_ERROR"
 
 
+def test_mexc_timestamp_error_does_not_pause_credential():
+    ok, category = AuthErrorClassifier.is_auth_error(
+        RuntimeError("mexc {\"code\":700003,\"msg\":\"Timestamp for this request is outside of the recvWindow.\"}")
+    )
+    assert ok is False
+    assert category == "TIMESTAMP_WINDOW"
+
+
+def test_mexc_permission_error_does_not_pause_credential():
+    ok, category = AuthErrorClassifier.is_auth_error(
+        RuntimeError("mexc EXCHANGE_AUTH_FAILED permission denied on private spot endpoint")
+    )
+    assert ok is False
+    assert category == "PERMISSION_DENIED"
+
+
+def test_mexc_auth_error_still_pauses_credential():
+    ok, category = AuthErrorClassifier.is_auth_error(
+        RuntimeError("mexc invalid api key or signature")
+    )
+    assert ok is True
+    assert category == "AUTH_FAILED"
+
+
 def test_integration_like_hot_reload_flow_without_order_during_rotation():
     async def _run():
         provider = FakeCredentialProvider(

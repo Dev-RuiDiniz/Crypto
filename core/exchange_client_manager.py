@@ -11,6 +11,7 @@ from ccxt.base.errors import AuthenticationError
 from core.credential_provider import CredentialProvider, CredentialRecord
 from core.credentials_service import ExchangeCredentialsService
 from core.notification_service import NotificationEventType, NotificationSeverity
+from utils.mexc_support import configure_mexc_client_async, is_mexc_exchange, log_mexc_error
 from utils.logger import get_logger
 
 log = get_logger("exchange_client_manager")
@@ -65,6 +66,8 @@ class ExchangeClientFactory:
                         "options": {"defaultType": "spot", "recvWindow": 60_000},
                     }
                 )
+                if is_mexc_exchange(exchange):
+                    await configure_mexc_client_async(ex, logger=log, context="client_factory")
                 return ex
             except Exception as exc:
                 last_exc = exc
@@ -77,6 +80,9 @@ class ExchangeClientFactory:
 class AuthErrorClassifier:
     @staticmethod
     def is_auth_error(err: Exception) -> tuple[bool, str]:
+        if is_mexc_exchange(_infer_exchange_name(err)):
+            classified = log_mexc_error(log, context="auth_classifier", operation="pause_decision", err=err)
+            return bool(classified["should_pause"]), str(classified["category"] or "")
         if isinstance(err, AuthenticationError):
             return True, "AUTHENTICATION_ERROR"
 
@@ -95,6 +101,17 @@ class AuthErrorClassifier:
             if key in msg:
                 return True, category
         return False, ""
+
+
+def _infer_exchange_name(err: Exception) -> str:
+    for attr in ("exchange", "exchange_id", "exchangeId"):
+        value = getattr(err, attr, None)
+        if value:
+            return str(value)
+    msg = str(err).lower()
+    if "mexc" in msg:
+        return "mexc"
+    return ""
 
 
 class ExchangeClientManager:
