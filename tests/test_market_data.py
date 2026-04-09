@@ -1,8 +1,9 @@
 import asyncio
 import configparser
+import time
 import unittest
 
-from core.market_data import BaseWsOrderBookProvider, MarketDataService
+from core.market_data import BaseWsOrderBookProvider, MEXCWsOrderBookProvider, MarketDataService
 from core.order_router import OrderRouter
 
 
@@ -101,7 +102,45 @@ class MarketDataTests(unittest.IsolatedAsyncioTestCase):
         hub.get_orderbook_meta = _meta
         router = OrderRouter(self.cfg, hub, portfolio=None, risk=None, state=None)
         ask = await router._best_ask_usdt("mexc", "SOL/USDT")
-        self.assertIsNone(ask)
+        self.assertEqual(ask, 101.0)
+
+    async def test_mexc_heartbeat_loop_sends_ping(self):
+        class FakeSocket:
+            def __init__(self):
+                self.closed = False
+                self.ping_count = 0
+                self.json_messages = []
+
+            async def ping(self):
+                self.ping_count += 1
+
+            async def send_json(self, payload):
+                self.json_messages.append(payload)
+
+            async def close(self):
+                self.closed = True
+
+        provider = MEXCWsOrderBookProvider(depth_limit=5, timeout_ms=40, heartbeat_interval_ms=10, heartbeat_timeout_ms=100)
+        key = ("default", "SOL/USDT")
+        fake_socket = FakeSocket()
+        provider._sockets[key] = fake_socket
+        now_ms = int(time.time() * 1000)
+        provider._state[key] = {"last_message_ms": now_ms, "last_pong_ms": now_ms, "last_heartbeat_ms": 0}
+        task = asyncio.create_task(provider._heartbeat_loop("default", "SOL/USDT"))
+        await asyncio.sleep(0.03)
+        await provider.close("default", "mexc", "SOL/USDT")
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertGreaterEqual(fake_socket.ping_count, 1)
+        self.assertIn({"method": "PING"}, fake_socket.json_messages)
+        self.assertTrue(task.cancelled())
+
+    def test_mexc_decode_error_raises_controlled_runtime_error(self):
+        provider = MEXCWsOrderBookProvider(depth_limit=5, timeout_ms=40)
+        with self.assertRaises(RuntimeError) as ctx:
+            provider._decode_depth_message(b"invalid-protobuf")
+        self.assertIn("ws_decode_error", str(ctx.exception))
 
 
 if __name__ == "__main__":

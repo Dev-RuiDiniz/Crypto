@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
+from google.protobuf.json_format import MessageToDict
+
+from proto_py import PushDataV3ApiWrapper_pb2
 
 from core.notification_service import NotificationEventType, NotificationSeverity
 
@@ -48,13 +51,23 @@ class BaseWsOrderBookProvider:
 
 
 class MEXCWsOrderBookProvider(BaseWsOrderBookProvider):
-    """Provider mínimo para MEXC spot public depth."""
+    """Provider MEXC Spot com heartbeat ativo e detecção de stream stale."""
 
-    def __init__(self, depth_limit: int = 20, timeout_ms: int = 3000):
+    def __init__(
+        self,
+        depth_limit: int = 20,
+        timeout_ms: int = 3000,
+        heartbeat_interval_ms: int = 20_000,
+        heartbeat_timeout_ms: int = 45_000,
+    ):
         self.depth_limit = int(depth_limit)
         self.timeout_ms = int(timeout_ms)
+        self.heartbeat_interval_ms = int(heartbeat_interval_ms)
+        self.heartbeat_timeout_ms = int(heartbeat_timeout_ms)
         self._sockets: Dict[Tuple[str, str], aiohttp.ClientWebSocketResponse] = {}
         self._sessions: Dict[str, aiohttp.ClientSession] = {}
+        self._state: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._heartbeat_tasks: Dict[Tuple[str, str], asyncio.Task] = {}
 
     @staticmethod
     def _to_channel_symbol(symbol: str) -> str:
@@ -79,42 +92,108 @@ class MEXCWsOrderBookProvider(BaseWsOrderBookProvider):
         channel = f"spot@public.limit.depth.v3.api.pb@{ch_sym}@{self.depth_limit}"
         await ws.send_json({"method": "SUBSCRIPTION", "params": [channel]})
         self._sockets[key] = ws
+        self._state[key] = {
+            "last_message_ms": int(time.time() * 1000),
+            "last_pong_ms": int(time.time() * 1000),
+            "last_heartbeat_ms": 0,
+        }
+        self._heartbeat_tasks[key] = asyncio.create_task(self._heartbeat_loop(tenant_id, symbol), name=f"mexc-heartbeat:{tenant_id}:{symbol}")
 
     async def recv_snapshot(self, tenant_id: str, exchange: str, symbol: str) -> Dict[str, Any]:
         key = (tenant_id, symbol)
         ws = self._sockets[key]
+        state = self._state[key]
+        receive_timeout = max(0.5, min(self.timeout_ms, self.heartbeat_interval_ms) / 1000.0)
         while True:
-            msg = await ws.receive(timeout=self.timeout_ms / 1000.0)
+            try:
+                msg = await ws.receive(timeout=receive_timeout)
+            except asyncio.TimeoutError:
+                now_ms = int(time.time() * 1000)
+                last_message_ms = int(state.get("last_message_ms") or 0)
+                last_pong_ms = int(state.get("last_pong_ms") or 0)
+                silence_ms = now_ms - max(last_message_ms, last_pong_ms)
+                if silence_ms >= self.timeout_ms:
+                    raise RuntimeError("ws_stale_no_messages")
+                continue
             if msg.type == aiohttp.WSMsgType.CLOSED:
                 raise RuntimeError("ws_closed")
             if msg.type == aiohttp.WSMsgType.ERROR:
                 raise RuntimeError("ws_error")
+            if msg.type == aiohttp.WSMsgType.PONG:
+                state["last_pong_ms"] = int(time.time() * 1000)
+                continue
+            if msg.type == aiohttp.WSMsgType.PING:
+                state["last_message_ms"] = int(time.time() * 1000)
+                await ws.pong()
+                continue
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                state["last_message_ms"] = int(time.time() * 1000)
+                text = (msg.data or "").strip().lower()
+                if "pong" in text:
+                    state["last_pong_ms"] = int(time.time() * 1000)
+                continue
             if msg.type not in (aiohttp.WSMsgType.BINARY,):
                 continue
 
-            # noinspection PyUnresolvedReferences
-            data = PushDataV3ApiWrapper_pb2.PushDataV3ApiWrapper()
-
-            data.ParseFromString(msg.data)
-
-            try:
-                data = MessageToDict(data.publicLimitDepths)
-            except Exception as e:
-                print(e)
-                exit(-1)
-
+            state["last_message_ms"] = int(time.time() * 1000)
+            data = self._decode_depth_message(msg.data)
             bids = data.get('bids') or []
             asks = data.get('asks') or []
             if not bids and not asks:
                 continue
             return {"bids": bids, "asks": asks, "timestamp": int(time.time() * 1000)}
 
+    def _decode_depth_message(self, payload: bytes) -> Dict[str, Any]:
+        wrapper = PushDataV3ApiWrapper_pb2.PushDataV3ApiWrapper()
+        try:
+            wrapper.ParseFromString(payload)
+            return MessageToDict(wrapper.publicLimitDepths)
+        except Exception as exc:
+            raise RuntimeError(f"ws_decode_error:{exc}") from exc
+
+    async def _heartbeat_loop(self, tenant_id: str, symbol: str) -> None:
+        key = (tenant_id, symbol)
+        while key in self._sockets:
+            await asyncio.sleep(self.heartbeat_interval_ms / 1000.0)
+            ws = self._sockets.get(key)
+            state = self._state.get(key)
+            if ws is None or state is None or ws.closed:
+                return
+            state["last_heartbeat_ms"] = int(time.time() * 1000)
+            try:
+                await ws.ping()
+            except Exception as exc:
+                log.warning("MEXC_WS_PING_FRAME_FAILED tenantId=%s symbol=%s error=%s", tenant_id, symbol, exc)
+                with contextlib.suppress(Exception):
+                    await ws.close()
+                return
+            try:
+                await ws.send_json({"method": "PING"})
+            except Exception:
+                log.debug("MEXC_WS_JSON_PING_FAILED tenantId=%s symbol=%s", tenant_id, symbol)
+            now_ms = int(time.time() * 1000)
+            silence_ms = now_ms - max(int(state.get("last_message_ms") or 0), int(state.get("last_pong_ms") or 0))
+            if silence_ms >= self.heartbeat_timeout_ms:
+                with contextlib.suppress(Exception):
+                    await ws.close()
+                return
+
     async def close(self, tenant_id: str, exchange: str, symbol: str) -> None:
         key = (tenant_id, symbol)
+        task = self._heartbeat_tasks.pop(key, None)
+        if task:
+            task.cancel()
+            with contextlib.suppress(Exception):
+                await task
         ws = self._sockets.pop(key, None)
         if ws:
             with contextlib.suppress(Exception):
                 await ws.close()
+        self._state.pop(key, None)
+        session = self._sessions.get(tenant_id)
+        if session and not self._sockets and not session.closed:
+            with contextlib.suppress(Exception):
+                await session.close()
 
 
 class PollingOrderBookProvider:
@@ -135,6 +214,8 @@ class MarketDataService:
         self.ws_reconnect_ms = int(os.getenv("MARKETDATA_WS_RECONNECT_MS", cfg.get("MARKETDATA", "WS_RECONNECT_MS", fallback="5000")))
         self.poll_interval_ms = int(os.getenv("MARKETDATA_POLL_INTERVAL_MS", cfg.get("MARKETDATA", "POLL_INTERVAL_MS", fallback="2000")))
         self.orderbook_limit = int(os.getenv("ORDERBOOK_LIMIT", cfg.get("MARKETDATA", "ORDERBOOK_LIMIT", fallback="20")))
+        self.mexc_ws_heartbeat_ms = int(os.getenv("MEXC_WS_HEARTBEAT_MS", cfg.get("MARKETDATA", "MEXC_WS_HEARTBEAT_MS", fallback="20000")))
+        self.mexc_ws_heartbeat_timeout_ms = int(os.getenv("MEXC_WS_HEARTBEAT_TIMEOUT_MS", cfg.get("MARKETDATA", "MEXC_WS_HEARTBEAT_TIMEOUT_MS", fallback="45000")))
 
         self._cache: Dict[CacheKey, MarketDataEntry] = {}
         self._lock = asyncio.Lock()
@@ -142,7 +223,14 @@ class MarketDataService:
         self._running = False
 
         self.polling_provider = PollingOrderBookProvider(ex_hub=ex_hub, orderbook_limit=self.orderbook_limit)
-        self.ws_providers = ws_providers or {"mexc": MEXCWsOrderBookProvider(depth_limit=self.orderbook_limit, timeout_ms=self.ws_stale_ms)}
+        self.ws_providers = ws_providers or {
+            "mexc": MEXCWsOrderBookProvider(
+                depth_limit=self.orderbook_limit,
+                timeout_ms=self.ws_stale_ms,
+                heartbeat_interval_ms=self.mexc_ws_heartbeat_ms,
+                heartbeat_timeout_ms=self.mexc_ws_heartbeat_timeout_ms,
+            )
+        }
         self.notification_service = notification_service
 
     def _key(self, exchange: str, symbol: str) -> CacheKey:
@@ -217,11 +305,12 @@ class MarketDataService:
                 raise
             except Exception as exc:
                 err = str(exc)
+                err_code = self._normalize_ws_error_code(err)
                 if ws_provider and circuit_state == "WS_ACTIVE":
-                    log.warning("MARKETDATA_WS_STALE_DETECTED tenantId=%s exchange=%s symbol=%s source=WS state=DEGRADED errorCode=%s", self.tenant_id, exchange, symbol, err)
+                    log.warning("MARKETDATA_WS_STALE_DETECTED tenantId=%s exchange=%s symbol=%s source=WS state=DEGRADED errorCode=%s rawError=%s", self.tenant_id, exchange, symbol, err_code, err)
                 circuit_state = "POLL_ACTIVE"
-                await self._mark_state(exchange, symbol, source="POLL", state="DEGRADED", error=err)
-                log.warning("MARKETDATA_FALLBACK_TO_POLL tenantId=%s exchange=%s symbol=%s source=POLL state=DEGRADED errorCode=%s", self.tenant_id, exchange, symbol, err)
+                await self._mark_state(exchange, symbol, source="POLL", state="DEGRADED", error=err_code)
+                log.warning("MARKETDATA_FALLBACK_TO_POLL tenantId=%s exchange=%s symbol=%s source=POLL state=DEGRADED errorCode=%s rawError=%s", self.tenant_id, exchange, symbol, err_code, err)
                 if self.notification_service is not None:
                     self.notification_service.notify_nowait(
                         tenant_id=self.tenant_id,
@@ -232,7 +321,7 @@ class MarketDataService:
                             "exchange": exchange,
                             "amount": 0,
                             "price": 0,
-                            "reason": err,
+                            "reason": err_code,
                             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                         },
                     )
@@ -260,6 +349,19 @@ class MarketDataService:
                         pass
                     circuit_state = "WS_ACTIVE"
                     log.info("MARKETDATA_WS_RECOVERED tenantId=%s exchange=%s symbol=%s source=WS state=OK", self.tenant_id, exchange, symbol)
+
+    @staticmethod
+    def _normalize_ws_error_code(err: str) -> str:
+        low = str(err or "").lower()
+        if "decode" in low:
+            return "WS_DECODE_ERROR"
+        if "stale" in low or "no_messages" in low:
+            return "WS_STALE"
+        if "closed" in low:
+            return "WS_CLOSED"
+        if "ping" in low or "pong" in low:
+            return "WS_HEARTBEAT_FAILED"
+        return "WS_RUNTIME_ERROR"
 
     async def get_order_book(self, tenant_id: str, exchange: str, symbol: str) -> Dict[str, Any]:
         key = (tenant_id, exchange.lower(), symbol.upper())
