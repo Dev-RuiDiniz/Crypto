@@ -21,6 +21,14 @@ from core.credentials_service import (
     ExchangeCredentialsService,
 )
 from security.redaction import redact_value
+from utils.mexc_support import (
+    MEXC_MAX_RECV_WINDOW_MS,
+    MEXC_SERVER_TIME_PATH,
+    classify_mexc_error,
+    configure_mexc_client,
+    is_mexc_exchange,
+    log_mexc_error,
+)
 
 exchange_credentials_bp = Blueprint("exchange_credentials", __name__)
 
@@ -179,6 +187,19 @@ def _exchange_candidates(exchange: str) -> list[str]:
 
 
 def _classify_exchange_test_error(exc: Exception) -> tuple[str, str, Optional[str]]:
+    mexc_exchange = is_mexc_exchange(getattr(exc, "exchange", "") or getattr(exc, "exchange_id", "") or ("mexc" if "mexc" in str(exc).lower() else ""))
+    if mexc_exchange:
+        classified = classify_mexc_error(exc)
+        if classified["category"] == "TIMESTAMP_WINDOW":
+            return "EXCHANGE_TIMESTAMP_WINDOW", "TIMESTAMP_WINDOW", "sync_computer_clock_and_retry_get_api_v3_time"
+        if classified["category"] == "PERMISSION_DENIED":
+            return "EXCHANGE_PERMISSION_DENIED", "PERMISSION_DENIED", "enable_spot_read_and_trade_permissions_and_ip_whitelist"
+        if classified["category"] == "ACCOUNT_MODE_MISMATCH":
+            return "EXCHANGE_ACCOUNT_MODE_MISMATCH", "ACCOUNT_MODE_MISMATCH", "use_spot_api_credentials_for_spot_private_endpoints"
+        if classified["category"] == "IP_RESTRICTED":
+            return "EXCHANGE_IP_RESTRICTED", "IP_RESTRICTED", "add_server_ip_to_api_key_whitelist"
+        if classified["category"] == "AUTH_FAILED":
+            return "EXCHANGE_AUTH_FAILED", "AUTH_FAILED", "verify_api_key_secret_and_signature"
     if isinstance(exc, (ccxt.RequestTimeout, ccxt.NetworkError)):
         return "EXCHANGE_TEST_TIMEOUT", "TIMEOUT", "check_internet_or_exchange_status"
     if isinstance(exc, ccxt.PermissionDenied):
@@ -306,11 +327,13 @@ def _build_failure_message(category: Optional[str], hint: Optional[str]) -> str:
     base_map = {
         "AUTH_FAILED": "Credencial rejeitada pela exchange (API key/secret/passphrase invalidos).",
         "PERMISSION_DENIED": "Credencial sem permissao para endpoints privados de ordens.",
-        "TIMESTAMP_WINDOW": "Falha de timestamp (hora local fora da janela da exchange).",
+        "TIMESTAMP_WINDOW": f"Falha de timestamp (hora local fora da janela da exchange; recvWindow maximo assumido={MEXC_MAX_RECV_WINDOW_MS} e horario recomendado via {MEXC_SERVER_TIME_PATH}).",
         "TIMEOUT": "Timeout de comunicacao com a exchange durante validacao.",
         "TRADE_PROBE_UNAVAILABLE": "Nao foi possivel validar endpoint privado de ordens nesta exchange.",
         "API_DEPRECATED": "A exchange rejeitou o fluxo legado de autenticacao/probe desta integracao.",
         "UNSUPPORTED_EXCHANGE": "Exchange nao suportada para validacao automatica.",
+        "ACCOUNT_MODE_MISMATCH": "A chave parece vinculada a modo/conta incorreta para endpoints Spot privados.",
+        "IP_RESTRICTED": "A chave foi recusada por restricao de IP.",
     }
     msg = base_map.get(str(category or "").upper(), "Falha ao validar credencial na exchange.")
     if hint:
@@ -431,6 +454,7 @@ def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, pass
         "probe_symbol": None,
         "probe_method": None,
         "error_message": None,
+        "diagnostics": {},
     }
     try:
         if low in {"mercadobitcoin", "mercado"}:
@@ -453,6 +477,8 @@ def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, pass
                         "options": {"defaultType": "spot", "recvWindow": 60_000},
                     }
                 )
+                if is_mexc_exchange(low):
+                    result["diagnostics"] = configure_mexc_client(client, logger=log, context="credentials_test")
                 break
 
         if client is None:
@@ -465,12 +491,6 @@ def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, pass
                 markets = loaded
             elif isinstance(getattr(client, "markets", None), dict):
                 markets = getattr(client, "markets")
-
-        if low in {"mexc", "mexc3"} and hasattr(client, "load_time_difference"):
-            try:
-                client.load_time_difference()
-            except Exception:
-                pass
 
         if hasattr(client, "fetch_balance"):
             client.fetch_balance()
@@ -488,6 +508,17 @@ def _test_exchange_connection(exchange: str, api_key: str, api_secret: str, pass
         result["ok"] = True
         return result
     except Exception as exc:
+        if is_mexc_exchange(low):
+            result["diagnostics"] = dict(result.get("diagnostics") or {})
+            result["diagnostics"].update(
+                log_mexc_error(
+                    log,
+                    context="credentials_test",
+                    operation="test_exchange_connection",
+                    err=exc,
+                    diagnostics=result["diagnostics"],
+                )
+            )
         error_code, category, hint = _classify_exchange_test_error(exc)
         result["ok"] = False
         result["error_code"] = error_code
@@ -709,6 +740,12 @@ def test_credentials(tenantId: str, id: str):
             details = [{"field": "exchange", "issue": str(category or "unknown").lower()}]
             if hint:
                 details.append({"field": "action", "issue": hint})
+            diagnostics = test_result.get("diagnostics") or {}
+            if diagnostics:
+                if diagnostics.get("serverTimeEndpoint"):
+                    details.append({"field": "serverTimeEndpoint", "issue": str(diagnostics["serverTimeEndpoint"])})
+                if diagnostics.get("timeDifferenceMs") is not None:
+                    details.append({"field": "timeDifferenceMs", "issue": str(diagnostics["timeDifferenceMs"])})
             return _error(
                 400,
                 "EXCHANGE_TEST_FAILED",
@@ -721,6 +758,9 @@ def test_credentials(tenantId: str, id: str):
                 "latencyMs": latency_ms,
                 "probeMethod": test_result.get("probe_method"),
                 "probeSymbol": test_result.get("probe_symbol"),
+                "category": test_result.get("category"),
+                "hint": test_result.get("hint"),
+                "diagnostics": test_result.get("diagnostics") or {},
             }
         )
     except ValidationError as exc:

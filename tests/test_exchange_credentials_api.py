@@ -2,6 +2,7 @@ import configparser
 import sqlite3
 
 from api import handlers
+from api.exchange_credentials_api import rate_limiter
 from api.server import app
 from core.credentials_service import ExchangeCredentialsService
 from core.state_store import StateStore
@@ -46,7 +47,7 @@ def test_create_list_update_revoke_flow(tmp_path, monkeypatch):
 
     listed = client.get("/api/tenants/t1/exchange-credentials", headers=_auth_headers("VIEWER"))
     assert listed.status_code == 200
-    assert len(listed.get_json()) == 1
+    assert listed.get_json()["count"] == 1
 
     cred_id = created_body["id"]
     updated = client.put(
@@ -116,6 +117,8 @@ def test_validation_and_redaction(tmp_path, monkeypatch, caplog):
 
 def test_test_endpoint_with_mock(tmp_path, monkeypatch):
     _bootstrap_db(tmp_path, monkeypatch)
+    rate_limiter._events.clear()
+    rate_limiter._cooldown_until.clear()
     client = app.test_client()
     created = client.post(
         "/api/tenants/t1/exchange-credentials",
@@ -131,7 +134,68 @@ def test_test_endpoint_with_mock(tmp_path, monkeypatch):
 
     from api import exchange_credentials_api as mod
 
-    monkeypatch.setattr(mod, "_test_exchange_connection", lambda *args, **kwargs: (True, 10, None, None))
+    monkeypatch.setattr(
+        mod,
+        "_test_exchange_connection",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "latency_ms": 10,
+            "probe_method": None,
+            "probe_symbol": None,
+            "category": None,
+            "hint": None,
+            "diagnostics": {},
+        },
+    )
     tested = client.post(f"/api/tenants/t1/exchange-credentials/{created['id']}/test", headers=_auth_headers())
     assert tested.status_code == 200
     assert tested.get_json()["ok"] is True
+
+
+def test_mexc_timestamp_classification_uses_specific_hint():
+    from api.exchange_credentials_api import _classify_exchange_test_error
+
+    err = RuntimeError("mexc {\"code\":700003,\"msg\":\"Timestamp for this request is outside of the recvWindow.\"}")
+    error_code, category, hint = _classify_exchange_test_error(err)
+    assert error_code == "EXCHANGE_TIMESTAMP_WINDOW"
+    assert category == "TIMESTAMP_WINDOW"
+    assert hint == "sync_computer_clock_and_retry_get_api_v3_time"
+
+
+def test_test_endpoint_returns_mexc_diagnostics(tmp_path, monkeypatch):
+    _bootstrap_db(tmp_path, monkeypatch)
+    rate_limiter._events.clear()
+    rate_limiter._cooldown_until.clear()
+    client = app.test_client()
+    created = client.post(
+        "/api/tenants/t2/exchange-credentials",
+        headers=_auth_headers(tenant="t2", user="u2"),
+        json={
+            "exchange": "mexc",
+            "label": "Conta Principal",
+            "apiKey": "abcdefgh12",
+            "apiSecret": "12345678secret",
+            "passphrase": None,
+        },
+    ).get_json()
+
+    from api import exchange_credentials_api as mod
+
+    monkeypatch.setattr(
+        mod,
+        "_test_exchange_connection",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "latency_ms": 10,
+            "probe_method": "fetch_open_orders(symbol)",
+            "probe_symbol": "BTC/USDT",
+            "category": None,
+            "hint": None,
+            "diagnostics": {"recvWindow": 60000, "serverTimeEndpoint": "/api/v3/time"},
+        },
+    )
+    tested = client.post(f"/api/tenants/t2/exchange-credentials/{created['id']}/test", headers=_auth_headers(tenant="t2", user="u2"))
+    body = tested.get_json()
+    assert tested.status_code == 200
+    assert body["diagnostics"]["recvWindow"] == 60000
+    assert body["diagnostics"]["serverTimeEndpoint"] == "/api/v3/time"

@@ -41,6 +41,7 @@ from core.exchange_circuit_breaker import ExchangeCircuitBreaker
 from core.metrics_service import MetricsService
 from core.notification_service import NotificationEventType, NotificationSeverity
 from app.pathing import get_work_dir
+from utils.mexc_support import configure_mexc_client, configure_mexc_client_async, is_mexc_exchange
 
 log = get_logger("exchanges")
 
@@ -489,7 +490,7 @@ class ExchangeHub:
                         "recvWindow": 60_000,  # útil p/ MEXC
                     },
                 })
-                if cand == "mexc":
+                if is_mexc_exchange(cand):
                     await self._sync_time_and_window_mexc(ex)
                 return ex
             except Exception as e:
@@ -499,18 +500,12 @@ class ExchangeHub:
 
     async def _sync_time_and_window_mexc(self, ex: ccxt.Exchange):
         try:
-            try:
-                ex.options = ex.options or {}
-                ex.options["recvWindow"] = max(int(ex.options.get("recvWindow", 5000)), 60_000)
-            except Exception:
-                pass
-            try:
-                if hasattr(ex, "load_time_difference"):
-                    await ex.load_time_difference()
-                elif hasattr(ex, "fetch_time"):
-                    await ex.fetch_time()
-            except Exception as e:
-                log.warning(f"[mexc] sync time falhou (prossegue mesmo assim): {e}")
+            diagnostics = configure_mexc_client(ex, logger=log, context="exchange_hub")
+            if diagnostics.get("timeDifferenceMs") is None:
+                try:
+                    await configure_mexc_client_async(ex, logger=log, context="exchange_hub_async")
+                except Exception as e:
+                    log.warning(f"[mexc] sync time falhou (prossegue mesmo assim): {e}")
         except Exception:
             pass
 
