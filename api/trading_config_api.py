@@ -39,10 +39,26 @@ def _authorize(tenant_id: str, required_roles: set[str]):
 
 
 def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(g.db_path)
+    existing = getattr(g, "_trading_config_conn", None)
+    if existing is not None:
+        return existing
+    conn = sqlite3.connect(g.db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000;")
     _ensure_schema(conn)
+    g._trading_config_conn = conn
     return conn
+
+
+@trading_config_bp.teardown_request
+def _close_conn(_exc):
+    conn = getattr(g, "_trading_config_conn", None)
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        g._trading_config_conn = None
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -82,6 +98,84 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         max_exposure_per_symbol REAL NOT NULL DEFAULT 0,
         kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        metadata TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS config_version (
+        id INTEGER PRIMARY KEY,
+        version INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT,
+        updated_by TEXT,
+        reason TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS config_pairs (
+        symbol TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        strategy TEXT NOT NULL DEFAULT 'StrategySpread',
+        risk_percentage REAL NOT NULL DEFAULT 0,
+        max_percent_per_trade REAL NOT NULL DEFAULT 0,
+        max_absolute_per_trade REAL NOT NULL DEFAULT 0,
+        max_open_orders_per_symbol INTEGER NOT NULL DEFAULT 0,
+        max_exposure_per_symbol REAL NOT NULL DEFAULT 0,
+        kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
+        updated_at REAL
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS bot_global_config (
+        id INTEGER PRIMARY KEY,
+        mode TEXT NOT NULL DEFAULT 'PAPER',
+        loop_interval_ms INTEGER NOT NULL DEFAULT 2000,
+        kill_switch_enabled INTEGER NOT NULL DEFAULT 0,
+        max_positions INTEGER NOT NULL DEFAULT 1,
+        max_daily_loss REAL NOT NULL DEFAULT 0,
+        updated_at TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS arbitrage_config (
+        tenant_id TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        exchange_a TEXT,
+        exchange_b TEXT,
+        threshold_percent REAL NOT NULL DEFAULT 0.15,
+        threshold_absolute REAL NOT NULL DEFAULT 0.2,
+        max_trade_size REAL NOT NULL DEFAULT 0,
+        cooldown_ms INTEGER NOT NULL DEFAULT 0,
+        mode TEXT NOT NULL DEFAULT 'TWO_LEG',
+        updated_at REAL,
+        PRIMARY KEY (tenant_id, symbol)
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS runtime_status (
+        id INTEGER PRIMARY KEY,
+        last_heartbeat_at REAL,
+        last_applied_config_at TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS arbitrage_state (
+        tenant_id TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        last_opportunity TEXT,
+        last_execution TEXT,
+        PRIMARY KEY (tenant_id, symbol)
     )
     """)
 
@@ -312,6 +406,11 @@ def put_global_risk(tenantId: str):
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(tenant_id) DO UPDATE SET max_percent_per_trade=excluded.max_percent_per_trade, max_absolute_per_trade=excluded.max_absolute_per_trade, max_open_orders_per_symbol=excluded.max_open_orders_per_symbol, max_exposure_per_symbol=excluded.max_exposure_per_symbol, kill_switch_enabled=excluded.kill_switch_enabled, updated_at=excluded.updated_at""",
         (tenantId, float(payload.get("maxPercentPerTrade") or 0), float(payload.get("maxAbsolutePerTrade") or 0), int(payload.get("maxOpenOrdersPerSymbol") or 0), float(payload.get("maxExposurePerSymbol") or 0), 1 if bool(payload.get("killSwitchEnabled", False)) else 0, now),
+    )
+    conn.execute(
+        """INSERT OR IGNORE INTO bot_global_config(id, mode, loop_interval_ms, kill_switch_enabled, max_positions, max_daily_loss, updated_at)
+        VALUES (1, 'PAPER', 2000, 0, 1, 0, ?)""",
+        (now,),
     )
     conn.execute("UPDATE bot_global_config SET kill_switch_enabled=?, updated_at=? WHERE id=1", (1 if bool(payload.get("killSwitchEnabled", False)) else 0, now))
     _audit(conn, tenant_id=tenantId, action="UPDATE", resource_type="RISK_GLOBAL", resource_id=tenantId, user_id=ctx.user_id, metadata={"killSwitchEnabled": bool(payload.get("killSwitchEnabled", False))})
