@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 import json
 import time
+from datetime import date
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, List
 
@@ -28,6 +29,15 @@ try:
 except Exception:
     import logging
     def get_logger(name: str): return logging.getLogger(name)
+
+from utils.mb_travel_rule import (
+    TRAVEL_RULE_EFFECTIVE_DATE,
+    is_crypto_wallet_symbol,
+    normalize_deposit_travel_rule,
+    normalize_wallet_symbol,
+    normalize_withdraw_travel_rule,
+    travel_rule_is_effective,
+)
 
 log = get_logger("adapters")
 
@@ -324,6 +334,7 @@ class MBV4Adapter:
         self._cached_account_id: Optional[str] = None
         self._cached_account_id_ts: float = 0.0
         self._account_ttl_sec: float = 3600.0  # 1 hora
+        self.travel_rule_effective_date: date = TRAVEL_RULE_EFFECTIVE_DATE
 
         if self.enabled and aiohttp is None:
             raise RuntimeError("Dependência ausente: 'aiohttp'. Instale com: pip install aiohttp")
@@ -346,12 +357,21 @@ class MBV4Adapter:
         """Converte SOL/BRL para SOL-BRL conforme documentação"""
         return symbol_local.replace("/", "-").upper()
 
+    @staticmethod
+    def to_wallet_symbol(symbol_local: str) -> str:
+        """Converte BTC/BRL ou BTC-BRL para BTC conforme endpoints /wallet/{symbol}"""
+        return normalize_wallet_symbol(symbol_local)
+
     async def _authorize(self) -> None:
         if not (self.login_user and self.login_pass):
-            raise RuntimeError("[MB v4] Credenciais ausentes para /authorize (MBV4_LOGIN/MBV4_PASSWORD).")
+            raise RuntimeError("[MB v4] Credenciais ausentes para /oauth2/token (MBV4_LOGIN/MBV4_PASSWORD).")
         await self._ensure_session()
-        url = f"{self.base_url}/authorize"
-        body = {"login": self.login_user, "password": self.login_pass}
+        url = f"{self.base_url}/oauth2/token"
+        body = {
+            "grant_type": "client_credentials",
+            "client_id": self.login_user,
+            "client_secret": self.login_pass
+        }
         async with self._session.post(url, headers={"Content-Type": "application/json", "Accept": "application/json"}, data=json.dumps(body)) as resp:
             txt_ct = resp.headers.get("Content-Type", "")
             try:
@@ -359,7 +379,7 @@ class MBV4Adapter:
             except Exception:
                 data = {"raw": await resp.text()}
             if resp.status != 200 or "access_token" not in data:
-                raise RuntimeError(f"[MB v4] authorize falhou: HTTP {resp.status} - {data}")
+                raise RuntimeError(f"[MB v4] token auth falhou (HTTP {resp.status}) - Cloudflare/API Error: {data}")
             self.token = str(data.get("access_token") or "").strip()
             self.token_exp = None
             if isinstance(data.get("expiration"), (int, float)):
@@ -377,7 +397,7 @@ class MBV4Adapter:
                     pass
             if self.token_exp is not None:
                 self.token_exp = max(0, self.token_exp - 30)
-            log.info("[mercadobitcoin v4] token obtido via /authorize.")
+            log.info("[mercadobitcoin v4] token obtido via /oauth2/token.")
 
     def _auth_headers(self) -> Dict[str, str]:
         base = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -419,7 +439,7 @@ class MBV4Adapter:
             except Exception:
                 payload = await resp.text()
             if resp.status in (401, 403) and self.login_user and self.login_pass and private:
-                log.warning("[mercadobitcoin v4] token possivelmente expirado — tentando renovar via /authorize.")
+                log.warning("[mercadobitcoin v4] token possivelmente expirado — tentando renovar via /oauth2/token.")
                 try:
                     await self._authorize()
                     async with self._session.request(method.upper(), url, headers=self._auth_headers(), params=params, data=data) as resp2:
@@ -634,4 +654,105 @@ class MBV4Adapter:
                 return data["content"]
             if isinstance(data.get("data"), list):
                 return data["data"]
+        return []
+
+    # -------- WALLET / TRAVEL RULE --------
+
+    async def list_deposits(
+        self,
+        wallet_symbol: str,
+        *,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+        from_: Optional[str] = None,
+        to: Optional[str] = None,
+        status: Optional[int] = None,
+        pending_travel_rule: Optional[bool] = None,
+    ) -> List[Dict[str, Any]]:
+        account_id = await self._get_default_account_id()
+        symbol = self.to_wallet_symbol(wallet_symbol)
+        endpoint = f"/accounts/{account_id}/wallet/{symbol}/deposits"
+        params = {
+            "page": page,
+            "page_size": page_size,
+            "from": from_,
+            "to": to,
+            "status": status,
+            "pending_travel_rule": pending_travel_rule,
+        }
+        code, data = await self._req("GET", endpoint, params=params)
+        if code != 200:
+            raise RuntimeError(f"[MB v4] list_deposits falhou: HTTP {code} - {data}")
+        return self._extract_items_list(data)
+
+    async def release_pending_deposit(self, wallet_symbol: str, deposit_id: str, travel_rule: Dict[str, Any]) -> Dict[str, Any]:
+        account_id = await self._get_default_account_id()
+        symbol = self.to_wallet_symbol(wallet_symbol)
+        normalized = normalize_deposit_travel_rule(travel_rule)
+        endpoint = f"/accounts/{account_id}/wallet/{symbol}/deposits/{deposit_id}"
+        code, data = await self._req("PATCH", endpoint, body=normalized)
+        if code not in (200, 201):
+            raise RuntimeError(f"[MB v4] release_pending_deposit falhou: HTTP {code} - {data}")
+        if isinstance(data, dict):
+            return data
+        return {"status": "released", "raw": data}
+
+    async def withdraw(
+        self,
+        wallet_symbol: str,
+        *,
+        quantity: str,
+        address: Optional[str] = None,
+        account_ref: Optional[int] = None,
+        description: Optional[str] = None,
+        destination_tag: Optional[str] = None,
+        network: Optional[str] = None,
+        tx_fee: Optional[str] = None,
+        travel_rule: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        account_id = await self._get_default_account_id()
+        symbol = self.to_wallet_symbol(wallet_symbol)
+        body: Dict[str, Any] = {
+            "quantity": str(quantity),
+        }
+        for key, value in {
+            "address": address,
+            "account_ref": account_ref,
+            "description": description,
+            "destination_tag": destination_tag,
+            "network": network,
+            "tx_fee": tx_fee,
+        }.items():
+            if value is not None and value != "":
+                body[key] = value
+
+        if is_crypto_wallet_symbol(symbol):
+            if travel_rule:
+                body["travel_rule"] = normalize_withdraw_travel_rule(travel_rule)
+            elif travel_rule_is_effective(effective_date=self.travel_rule_effective_date):
+                raise RuntimeError(
+                    f"[MB v4] withdraw de cripto requer travel_rule a partir de {self.travel_rule_effective_date.isoformat()}"
+                )
+            else:
+                log.warning(
+                    "[MB v4] withdraw de cripto sem travel_rule antes da vigencia regulatoria (%s); ajuste recomendado.",
+                    self.travel_rule_effective_date.isoformat(),
+                )
+
+        endpoint = f"/accounts/{account_id}/wallet/{symbol}/withdraw"
+        code, data = await self._req("POST", endpoint, body=body)
+        if code not in (200, 201):
+            raise RuntimeError(f"[MB v4] withdraw falhou: HTTP {code} - {data}")
+        if isinstance(data, dict):
+            return data
+        return {"status": "submitted", "raw": data}
+
+    def _extract_items_list(self, data: Any) -> List[Dict[str, Any]]:
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("items", "content", "data"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    return value
         return []

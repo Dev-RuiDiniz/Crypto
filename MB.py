@@ -4,7 +4,7 @@
 #
 # - Lê credenciais de [EXCHANGES.mercadobitcoin] em config.txt (mesma pasta).
 # - Se MBV4_BASE ausente, tenta bases conhecidas até uma responder.
-# - Usa BEARER se presente; caso contrário, faz POST /authorize (login/senha).
+# - Usa BEARER se presente; caso contrário, faz POST /oauth2/token.
 # - Descobre automaticamente a rota de ORDERS testando variações conhecidas.
 # - Faz dumps de payloads (accounts, balances, open_orders) em ./mb_dumps/
 #
@@ -21,6 +21,12 @@ import argparse
 import datetime as dt
 import configparser
 from typing import Dict, Any, Optional, Tuple, List
+
+from utils.mb_travel_rule import (
+    normalize_deposit_travel_rule,
+    normalize_wallet_symbol,
+    normalize_withdraw_travel_rule,
+)
 
 # -------- HTTP backend (requests se disponível; senão urllib) ----------
 _USE_REQUESTS = False
@@ -165,12 +171,12 @@ class MBV4Client:
 
         print(f"[{_now_ts()}] MBV4_BASE não informado — iniciando auto-discovery...")
         for cand in self.BASE_CANDIDATES:
-            # critério: se eu consigo /authorize (com login/senha) OU /accounts (com bearer)
+            # critério: se eu consigo /oauth2/token (com login/senha) OU /accounts (com bearer)
             ok = False
             if self.login and self.password:
                 code, payload, _ = _http_request(
-                    "POST", f"{cand}/authorize",
-                    json_body={"login": self.login, "password": self.password},
+                    "POST", f"{cand}/oauth2/token",
+                    json_body={"grant_type": "client_credentials", "client_id": self.login, "client_secret": self.password},
                     timeout=self.timeout
                 )
                 ok = (code == 200 and isinstance(payload, dict) and "access_token" in payload)
@@ -199,14 +205,14 @@ class MBV4Client:
             raise RuntimeError("Sem BEARER e sem MBV4_LOGIN/MBV4_PASSWORD no config.txt.")
 
         code, payload, _ = _http_request(
-            "POST", f"{self.base}/authorize",
-            json_body={"login": self.login, "password": self.password},
+            "POST", f"{self.base}/oauth2/token",
+            json_body={"grant_type": "client_credentials", "client_id": self.login, "client_secret": self.password},
             timeout=self.timeout
         )
         if code != 200 or not isinstance(payload, dict) or "access_token" not in payload:
-            raise RuntimeError(f"/authorize falhou: HTTP {code} - {payload}")
+            raise RuntimeError(f"/oauth2/token falhou: HTTP {code} - {payload}")
         self.token = str(payload.get("access_token") or "").strip()
-        print(f"[{_now_ts()}] token obtido via /authorize.")
+        print(f"[{_now_ts()}] token obtido via /oauth2/token.")
 
     def _headers(self, *, add_account: bool = False) -> Dict[str, str]:
         h = {"Content-Type": "application/json"}
@@ -287,6 +293,60 @@ class MBV4Client:
         if code != 200:
             print(f"[{_now_ts()}] AVISO: open_orders retornou HTTP {code} — dumpando assim mesmo.")
         return {"http_status": code, "data": payload, "path": path}
+
+    # ---------- Wallet / Travel Rule ----------
+    def list_deposits(self, symbol: str, *, status: Optional[int] = None, pending_travel_rule: Optional[bool] = None) -> Any:
+        if not self.account_id:
+            raise RuntimeError("accountId ausente antes de listar depósitos.")
+        wallet_symbol = normalize_wallet_symbol(symbol)
+        code, payload, _ = _http_request(
+            "GET",
+            f"{self.base}/accounts/{self.account_id}/wallet/{wallet_symbol}/deposits",
+            headers=self._headers(add_account=True),
+            params={"status": status, "pending_travel_rule": pending_travel_rule},
+            timeout=self.timeout,
+        )
+        if code != 200:
+            raise RuntimeError(f"/wallet/{wallet_symbol}/deposits falhou: HTTP {code} - {payload}")
+        return payload
+
+    def release_pending_deposit(self, symbol: str, deposit_id: str, travel_rule: Dict[str, Any]) -> Any:
+        if not self.account_id:
+            raise RuntimeError("accountId ausente antes de liberar depósito pendente.")
+        wallet_symbol = normalize_wallet_symbol(symbol)
+        body = normalize_deposit_travel_rule(travel_rule)
+        code, payload, _ = _http_request(
+            "PATCH",
+            f"{self.base}/accounts/{self.account_id}/wallet/{wallet_symbol}/deposits/{deposit_id}",
+            headers=self._headers(add_account=True),
+            json_body=body,
+            timeout=self.timeout,
+        )
+        if code != 200:
+            raise RuntimeError(f"release pending deposit falhou: HTTP {code} - {payload}")
+        return payload
+
+    def withdraw(self, symbol: str, *, quantity: str, travel_rule: Optional[Dict[str, Any]] = None, **extra_fields: Any) -> Any:
+        if not self.account_id:
+            raise RuntimeError("accountId ausente antes de withdraw.")
+        wallet_symbol = normalize_wallet_symbol(symbol)
+        body = {"quantity": str(quantity)}
+        for key in ("address", "account_ref", "description", "destination_tag", "network", "tx_fee"):
+            value = extra_fields.get(key)
+            if value is not None and value != "":
+                body[key] = value
+        if travel_rule:
+            body["travel_rule"] = normalize_withdraw_travel_rule(travel_rule)
+        code, payload, _ = _http_request(
+            "POST",
+            f"{self.base}/accounts/{self.account_id}/wallet/{wallet_symbol}/withdraw",
+            headers=self._headers(add_account=True),
+            json_body=body,
+            timeout=self.timeout,
+        )
+        if code != 200:
+            raise RuntimeError(f"withdraw falhou: HTTP {code} - {payload}")
+        return payload
 
     # ---------- Pipeline principal ----------
     def run(self):

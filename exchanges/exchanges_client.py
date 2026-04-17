@@ -815,6 +815,43 @@ class ExchangeHub:
             return free_quote / self.usdt_brl
         return free_quote
 
+    # ---------------- wallet / travel rule (Mercado Bitcoin)
+
+    def _ensure_mb_wallet_adapter(self):
+        if not (self.mb_v4 and self.mb_v4.enabled):
+            raise RuntimeError("mercadobitcoin wallet v4 adapter is not enabled")
+        return self.mb_v4
+
+    async def mb_list_deposits(
+        self,
+        wallet_symbol: str,
+        *,
+        status: Optional[int] = None,
+        pending_travel_rule: Optional[bool] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+        from_: Optional[str] = None,
+        to: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        adapter = self._ensure_mb_wallet_adapter()
+        return await adapter.list_deposits(
+            wallet_symbol,
+            status=status,
+            pending_travel_rule=pending_travel_rule,
+            page=page,
+            page_size=page_size,
+            from_=from_,
+            to=to,
+        )
+
+    async def mb_release_pending_deposit(self, wallet_symbol: str, deposit_id: str, travel_rule: Dict[str, Any]) -> Dict[str, Any]:
+        adapter = self._ensure_mb_wallet_adapter()
+        return await adapter.release_pending_deposit(wallet_symbol, deposit_id, travel_rule)
+
+    async def mb_withdraw(self, wallet_symbol: str, **kwargs) -> Dict[str, Any]:
+        adapter = self._ensure_mb_wallet_adapter()
+        return await adapter.withdraw(wallet_symbol, **kwargs)
+
     # ---------------- ordens (privadas → MB v4 se disponível) - CORRIGIDO
 
     async def create_limit_order(
