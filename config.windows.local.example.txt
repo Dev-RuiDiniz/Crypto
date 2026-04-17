@@ -71,38 +71,38 @@ hedge_slippage_bps = 10
 
 [EXCHANGES.mercadobitcoin]
 enabled = false
-api_key = 
-api_secret = 
-password = 
-mbv4_bearer_token = 
-mbv4_login = 
-mbv4_password = 
+api_key =
+api_secret =
+password =
+mbv4_bearer_token =
+mbv4_login =
+mbv4_password =
 mbv4_orders_base = trading_spot
 mbv4_extra_headers = X-Product: spot;X-Account-Id:{auto};X-User-Locale: pt-BR
 fee_maker = 0.001
 fee_taker = 0.001
 
 [EXCHANGES.novadax]
-enabled = true
-api_key = 
-api_secret = 
-password = 
+enabled = false
+api_key =
+api_secret =
+password =
 fee_maker = 0.001
 fee_taker = 0.001
 
 [EXCHANGES.gate]
 enabled = false
-api_key = 
-api_secret = 
-password = 
+api_key =
+api_secret =
+password =
 fee_maker = 0.0002
 fee_taker = 0.0005
 
 [EXCHANGES.mexc]
 enabled = false
-api_key = 
-api_secret = 
-password = 
+api_key =
+api_secret =
+password =
 fee_maker = 0.0002
 fee_taker = 0.0006
 
@@ -141,4 +141,3 @@ post_fill_use_filled_qty = true
 alert_cooldown_sec = 120
 balance_ttl_sec = 8
 one_cycle_and_exit = false
-

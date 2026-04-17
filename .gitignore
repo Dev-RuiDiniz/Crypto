@@ -13,6 +13,10 @@ frontend/electron/out/
 # Runtime outputs
 logs/
 *.log
+data/*.db
+data/api_snapshot.json
+config.windows.local.txt
+.pytest_cache/
 
 # OS/editor
 .DS_Store
