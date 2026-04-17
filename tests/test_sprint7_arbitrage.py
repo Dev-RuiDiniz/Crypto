@@ -53,6 +53,7 @@ class Sprint7ArbitrageTests(unittest.IsolatedAsyncioTestCase):
         self.strategy = StrategyArbitrageSimple(cfg, self.hub, self.state, self.risk, tenant_id="default")
 
     def tearDown(self):
+        self.state.close()
         self.tmpdir.cleanup()
 
     async def test_detect_and_execute_two_legs_with_idempotency(self):

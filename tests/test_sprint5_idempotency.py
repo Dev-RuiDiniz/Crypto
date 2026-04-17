@@ -43,6 +43,7 @@ class IdempotencyTests(unittest.IsolatedAsyncioTestCase):
         self.router = OrderRouter(cfg, self.hub, portfolio=None, risk=None, state=self.state)
 
     def tearDown(self):
+        self.state.close()
         self.tmpdir.cleanup()
 
     async def test_retry_should_reuse_same_client_order_id(self):

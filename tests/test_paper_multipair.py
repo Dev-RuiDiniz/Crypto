@@ -133,6 +133,7 @@ class PaperMultiPairTests(unittest.IsolatedAsyncioTestCase):
         conn.close()
 
     def tearDown(self):
+        self.state.close()
         self.tmpdir.cleanup()
 
     async def test_paper_two_pairs_should_run_in_parallel_or_interleaved(self):

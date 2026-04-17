@@ -2,7 +2,7 @@ import requests
 
 BASE_URL = "http://127.0.0.1:8000"
 
-def test_endpoint(endpoint):
+def probe_endpoint(endpoint):
     try:
         response = requests.get(f"{BASE_URL}{endpoint}")
         print(f"{endpoint}: {response.status_code} - {response.text[:100]}...")
@@ -11,8 +11,9 @@ def test_endpoint(endpoint):
         print(f"{endpoint}: ERRO - {e}")
         return None
 
-print("=== TESTANDO ENDPOINTS ===")
-test_endpoint("/api/debug")
-test_endpoint("/api/balances") 
-test_endpoint("/api/orders?state=pending")
-test_endpoint("/api/mids?pair=SOL-USDT")
+if __name__ == "__main__":
+    print("=== TESTANDO ENDPOINTS ===")
+    probe_endpoint("/api/debug")
+    probe_endpoint("/api/balances")
+    probe_endpoint("/api/orders?state=pending")
+    probe_endpoint("/api/mids?pair=SOL-USDT")

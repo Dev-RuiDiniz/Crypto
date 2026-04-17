@@ -16,6 +16,7 @@ class ConfigVersionStoreTests(unittest.TestCase):
         self.state = StateStore(cfg)
 
     def tearDown(self):
+        self.state.close()
         self.tmpdir.cleanup()
 
     def test_bump_config_version_should_create_and_increment(self):

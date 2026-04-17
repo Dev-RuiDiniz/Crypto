@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+import aiohttp
 import ccxt.async_support as ccxt
 from ccxt.base.errors import AuthenticationError
 
@@ -66,6 +68,15 @@ class ExchangeClientFactory:
                         "options": {"defaultType": "spot", "recvWindow": 60_000},
                     }
                 )
+                # In some Windows client networks, aiodns intermittently fails resolution
+                # ("Could not contact DNS servers"). Use a threaded resolver session for CCXT async.
+                if os.name == "nt":
+                    with_timeout = aiohttp.ClientTimeout(total=self.http_timeout_sec)
+                    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+                    prev_session = getattr(ex, "session", None)
+                    if prev_session is not None and not getattr(prev_session, "closed", True):
+                        await prev_session.close()
+                    ex.session = aiohttp.ClientSession(timeout=with_timeout, connector=connector)
                 if is_mexc_exchange(exchange):
                     await configure_mexc_client_async(ex, logger=log, context="client_factory")
                 return ex
