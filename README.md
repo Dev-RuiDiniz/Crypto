@@ -92,6 +92,7 @@ npm run build
 ## 4.9 Segurança
 - Usar somente chaves **trade-only**.
 - Nunca habilitar permissão de **withdraw**.
+- Se operacoes de wallet do Mercado Bitcoin forem habilitadas por excecao operacional, adequar `travel_rule` para saques cripto e liberacao de depositos pendentes a partir de 2026-05-01.
 - Manter limites de risco conservadores no início.
 - Não expor segredos em frontend/logs.
 
@@ -106,6 +107,9 @@ npm run build
 ---
 
 ## Índice da documentação consolidada
+- `AGENT_INSTRUCTIONS.md` (Contexto para Agentes de IA)
+- `docs/adr/` (Architecture Decision Records)
+- `docs/20-mercadobitcoin-travel-rule-2026-04-17.md`
 - `docs/00-overview.md`
 - `docs/01-architecture.md`
 - `docs/02-setup.md`

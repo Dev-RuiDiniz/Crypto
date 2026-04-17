@@ -73,7 +73,7 @@ Como funciona no sistema:
 
 Como enviamos dados para a exchange:
 - Autenticacao privada v4:
-  - `POST /api/v4/authorize` com body `{ "login", "password" }` (quando nao ha bearer valido).
+  - `POST /oauth2/token` com `grant_type=client_credentials`, `client_id` e `client_secret` (quando nao ha bearer valido).
 - Descoberta de conta:
   - `GET /api/v4/accounts`
 - Saldo:

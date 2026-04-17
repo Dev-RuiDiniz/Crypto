@@ -11,3 +11,9 @@
 - `ACCOUNT_MODE_MISMATCH`: confirmar que a key pertence a conta/escopo Spot e nao Futures.
 - `IP_RESTRICTED`: validar whitelist de IP da API key.
 - `WS_DEGRADED` com `WS_STALE` ou `WS_HEARTBEAT_FAILED`: verificar conectividade, heartbeat MEXC e fallback para polling.
+
+## Mercado Bitcoin
+- `token auth falhou` em `/oauth2/token`: revisar `MBV4_LOGIN` e `MBV4_PASSWORD`, alem de eventuais bloqueios de CDN/WAF.
+- `withdraw de cripto requer travel_rule`: montar o payload `travel_rule` antes de chamar o endpoint de saque.
+- Depositos com `status=0` e `pending_travel_rule=true`: usar o endpoint `Release Pending Deposit`.
+- Em rotas `/wallet/{symbol}`, usar o ativo puro no path, por exemplo `BTC` em vez de `BTC-BRL`.
