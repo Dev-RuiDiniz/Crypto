@@ -752,6 +752,84 @@ definitions:
           for correct values.
         example: "2"
         type: string
+      travel_rule:
+        description: Travel Rule Information
+        $ref: '#/definitions/TravelRuleWithdrawRequest'
+        type: object
+    type: object
+  TravelRuleWithdrawRequest:
+    properties:
+      custody_type:
+        type: string
+        description: Counterpart custody. Should be SELF_CUSTODY, NATIONAL_TRANSFER, INTERNATIONAL_TRANSFER
+        example: "INTERNATIONAL_TRANSFER"
+      counterparty_name:
+        type: string
+        description:
+        example: "Company A"
+      counterparty_relationship_code:
+        type: string
+        description: |-
+          For companies performing INTERNATIONAL_TRANSFER only, inform the counterparty relationship
+
+          Code  | Description
+          ------|-------------
+          40 | Same company
+          50 | Other
+        example: "40"
+      counterparty_country:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. Destination country following ISO 3166-1 alpha-2 standard.
+        example: "US"
+      counterparty_vasp:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. Destination VASP name according to allowed list.
+        example: "VASP_A"
+      purpose_code:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. See Purpose Code section for all possible values.
+        example: "67995"
+    type: object
+  TravelRuleDepositRequest:
+    properties:
+      custody_type:
+        type: string
+        description: Counterpart custody. Should be SELF_CUSTODY, NATIONAL_TRANSFER, INTERNATIONAL_TRANSFER
+        example: "INTERNATIONAL_TRANSFER"
+      counterparty_name:
+        type: string
+        description:
+        example: "Company A"
+      counterparty_relationship_code:
+        type: string
+        description: |-
+          For companies performing INTERNATIONAL_TRANSFER only, inform the counterparty relationship
+
+          Code  | Description
+          ------|-------------
+          40 | Same company
+          50 | Other
+        example: "40"
+      counterparty_country:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. Source country following ISO 3166-1 alpha-2 standard.
+        example: "US"
+      counterparty_vasp:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. Source VASP name according to allowed list.
+        example: "VASP_A"
+      purpose_code:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only. For INTERNATIONAL_TRANSFER only. See Purpose Code section for all possible values.
+        example: "67995"
+      declared_client_name:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only (optional). Self declared client name.
+        example: "Client Name"
+      declared_client_city:
+        type: string
+        description: For INTERNATIONAL_TRANSFER only (optional). Self declared client city.
+        example: "Client City"
     type: object
   BankAccount:
     properties:
@@ -1006,6 +1084,13 @@ definitions:
         items:
           type: string
         type: array
+      round-lot:
+        description: Minimum order quantity increment (step size) for the symbol
+        example:
+          - "0.00001000"
+        items:
+          type: string
+        type: array
     type: object
   share.AssetFee:
     properties:
@@ -1230,11 +1315,11 @@ info:
 
     ### WebSocket API
     If you are looking for WebSocket API documentation [click here](https://ws.mercadobitcoin.net/docs/v0)
-    
+
     # Rate Limit
-    
+
     <b>The default rate limit total:</b> 500 requests/min.
-    
+
     Considering both private and public information. Each endpoint has its own rate limit, as described in the endpoints section. If you need to increase this number, please contact us via trade.support@mercadobitcoin.com.br.
 
     # Errors
@@ -1369,6 +1454,131 @@ info:
     }
     ```
 
+    # Travel Rule
+
+    According to Brazilian law all cryptocurrency transfers must inform travel rule data for each request.
+
+    Once a deposit is identified the client is notified and balance isn't updated until the travel rule information is provided.
+
+    Optionally clients can check on List Deposits endpoint to identify pending deposits without travel rule data and inform it using Release Pending Deposit endpoint
+
+    ## Purpose Code
+
+    Each International Transfer should inform a purpose according to below tables
+
+    ### Purpose Codes for transfers below US$ 50,000
+
+    Code | Description
+    ----------|-------------
+    12995 | Comércio e serviços Comércio de produtos
+    32999 | Uso pessoal Viagens e turismo
+    37994 | Uso pessoal Enviar para pessoas
+    46002 | Comércio e serviços Softwares e serviços de tecnologia
+    46978 | Comércio e serviços Serviços de negócios
+    46992 | Comércio e serviços Serviços gerais
+    67995 | Uso pessoal Minha conta no exterior
+    72980 | Investimentos e Capital Crédito no exterior
+    72997 | Investimentos e Capital Juros de crédito no exterior
+    91992 | Outra finalidade
+
+    ### Purpose Codes for transfers above US$ 50,000
+    Code | Description
+    ----------|-------------
+    12029 | Comércio de bens Operações de back to back
+    12108 | Recebimento antecipado Até 360 dias
+    12115 | Recebimento antecipado Mais de 360 dias
+    12122 | Recebimento posterior Até 360 dias
+    12139 | Recebimento posterior Mais de 360 dias
+    12186 | Comércio de bens Ativos virtuais
+    12407 | Pagamento antecipado Até 180 dias
+    12414 | Pagamento antecipado de 181 até 360 dias
+    12421 | Pagamento antecipado Mais de 360 dias
+    12438 | Pagamento posterior Até 180 dias
+    12445 | Pagamento posterior de 181 até 360 dias
+    12452 | Pagamento posterior Mais de 360 dias
+    12823 | Comércio de bens Mercadorias sem trânsito aduaneiro
+    22301 | Transportes Frete sobre exportação
+    22318 | Transportes Frete sobre importação
+    22325 | Transportes Meios de transporte com tripulação
+    22332 | Transportes Passagens
+    22349 | Transportes Outros
+    27100 | Seguros Seguro sobre fretes / transportes
+    27117 | Seguros Seguro sobre prêmios
+    27124 | Seguros Seguro sobre indenização
+    32999 | Viagens internacionais
+    37028 | Transferências unilaterais Impostos
+    37217 | Transferências unilaterais Patrimônio
+    37303 | Transferências unilaterais Manutenção de residentes
+    37310 | Transferências unilaterais Contribuições de seguridade social
+    37327 | Transferências unilaterais Contribuições de fundos de pensão
+    37334 | Transferências unilaterais Doações e cooperação internacional
+    37358 | Transferências unilaterais Outras
+    46002 | Técnico, profissional e administrativo Computação e informação
+    46019 | Técnico, profissional e administrativo Serviços financeiros
+    46026 | Técnico, profissional e administrativo Reparos, manutenção e assistências
+    46033 | Técnico, profissional e administrativo Agricultura, mineração, tratamento de resíduos e serviços relacionados
+    46040 | Técnico, profissional e administrativo Gestão e jurídicos
+    46057 | Técnico, profissional e administrativo Serviços de engenharia/arquitetura e outros serviços técnicos
+    46105 | Serviços diversos Construção
+    46112 | Serviços diversos Marcas registradas e franquias
+    46129 | Serviços diversos Patentes e tecnologia
+    46136 | Serviços diversos Direitos de utilização de marcas
+    46150 | Pessoais culturais, saúde e educação Jogos e apostas
+    46167 | Pessoais culturais, saúde e educação Outros tipos de entretenimento
+    46198 | Serviços diversos Receitas e despesas governamentais
+    46208 | Outros Aluguel de imóveis e equipamentos
+    46215 | Outros Compra e venda de imóveis
+    46222 | Outros Reembolsos por serviços prestados ou recebidos – empresas de mesmo grupo econômico
+    46239 | Outros Cessão de créditos
+    46246 | Outros Indenizações não relacionadas a seguro
+    47001 | Técnico, profissional e administrativo Serviços postais e courier
+    47018 | Técnico, profissional e administrativo Serviços de telecomunicações
+    47063 | Técnico, profissional e administrativo Pesquisa e desenvolvimento
+    47111 | Técnico, profissional e administrativo Serviços de manufatura
+    47173 | Técnico, profissional e administrativo Audiovisuais e serviços relacionados
+    47551 | Direitos autorais Cópia e distribuição de software
+    47568 | Direitos autorais Outras licenças de distribuição
+    47575 | Direitos autorais Cessão ou uso de software
+    47582 | Direitos autorais Cessão ou uso de outros
+    47609 | Serviços diversos Despesa sobre transações comerciais
+    47908 | Outros Salários e outras compensações
+    47922 | Outros Direitos de atletas profissionais
+    47939 | Outros Créditos de carbono e afins
+    52027 | Mercado financeiro e de capitais Ações e fundos de investimentos
+    52106 | Mercado financeiro e de capitais Juros de títulos no país
+    52113 | Mercado financeiro e de capitais Juros de títulos - mercado externo
+    52144 | Mercado financeiro e de capitais Ágios e deságios de títulos no Brasil
+    52429 | Empréstimos, financiamentos e créditos Juros sobre operações
+    52436 | Empréstimos, financiamentos e créditos Juros sobre outras operações
+    52443 | Rendas de capitais Dividendos e distribuição de lucros
+    52508 | Capitais brasileiros Juros sobre depósitos
+    67005 | Mercado financeiro e de capitais Ações
+    67043 | Mercado financeiro e de capitais Fundos de investimento
+    67050 | Mercado financeiro e de capitais BDR
+    67108 | Títulos de dívida Até 360 dias
+    67115 | Títulos de dívida Mais 360 dias
+    67201 | Derivativos Prêmios de opções e ajustes periódicos
+    67218 | Derivativos Margens, garantias e colaterais
+    67438 | Empréstimos, financiamentos e créditos Até 360 dias
+    67445 | Empréstimos, financiamentos e créditos Mais 360 dias
+    67476 | Investimento direto Fusão ou aquisição
+    67483 | Investimento direto Outros
+    67531 | Capitais brasileiros Depósitos
+    67919 | Capitais brasileiros Participação em capital internacional
+    67971 | Capitais brasileiros RERCT
+    72007 | Mercado financeiro e de capitais Ações
+    72045 | Mercado financeiro e de capitais Fundos de investimento
+    72090 | Mercado financeiro e de capitais DR
+    72124 | Títulos no mercado externo Até 360 dias
+    72131 | Títulos no mercado externo mais 360 dias
+    72210 | Derivativos Margens, garantias e colaterais
+    72241 | Derivativos Prêmios de opções e ajustes periódicos
+    72423 | Empréstimos, financiamentos e créditos Até 360 dias
+    72430 | Empréstimos, financiamentos e créditos Mais 360 dias
+    72447 | Investimento direto Fusão ou aquisição
+    72454 | Investimento direto Outros
+    72533 | Capitais estrangeiros Depósitos
+
     # Authentication
     ### Client Credential
     This is a Oauth2 `client_credential` flow.
@@ -1393,7 +1603,7 @@ paths:
     get:
       description: |-
         Request for asset's withdraw fee (network fee charge)
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/sec
       parameters:
         - description: Instrument asset in the form BASE(e.g. USDC)
@@ -1422,7 +1632,7 @@ paths:
         - application/json
       description: |-
         Get current orderbook (depth of market) for the instrument.
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/sec
       parameters:
         - description: Instrument symbol in the form BASE-QUOTE(e.g. BTC-BRL)
@@ -1452,7 +1662,7 @@ paths:
         - application/json
       description: |-
         List trades (executions).
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/sec
       parameters:
         - description: Instrument symbol in the form BASE-QUOTE(e.g. BTC-BRL)
@@ -1543,7 +1753,7 @@ paths:
         - application/json
       description: |-
         List orders from specific market (most recent first)
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 10 requests/sec
       parameters:
         - description: Instrument symbol in the form BASE-QUOTE(e.g. BTC-BRL)
@@ -1611,7 +1821,7 @@ paths:
         - application/json
       description: |-
         Place a new order.
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 3 requests/sec
       parameters:
         - description: Instrument symbol in the form BASE-QUOTE(e.g. BTC-BRL)
@@ -1648,7 +1858,7 @@ paths:
         - application/json
       description: |-
         Cancel an existing order.
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 3 requests/sec
       parameters:
         - description: Account identifier. Obtained from List Accounts
@@ -1691,7 +1901,7 @@ paths:
         - application/json
       description: |-
         Get unique order by identifier
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/sec
       parameters:
         - description: Instrument symbol in the form BASE-QUOTE(e.g. BTC-BRL)
@@ -1761,7 +1971,7 @@ paths:
         - application/json
       description: |-
         Get balances for all markets, including fiat, for an account
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 3 requests/sec
       parameters:
         - description: Account identifier. Obtained from List Accounts
@@ -1843,7 +2053,7 @@ paths:
         - application/json
       description: |-
         Cancel all open orders for an account.
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/min
       parameters:
         - description: Account identifier. Obtained from List Accounts
@@ -1877,7 +2087,7 @@ paths:
         - application/json
       description: |-
         List orders from all markets (most recent first)
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 3 requests/sec
       parameters:
         - description: Account identifier. Obtained from List Accounts
@@ -1919,7 +2129,7 @@ paths:
         - application/json
       description: |-
         Get open positions (open orders) for an account.
-        
+
         <h5 class="sc-iqsfdx sc-gyEloo dONVW hlxGDx">Rate Limit:</h5> 1 requests/sec
       parameters:
         - description: Account identifier. Obtained from List Accounts
@@ -1980,6 +2190,23 @@ paths:
           in: query
           name: to
           type: string
+        - description: |-
+            Deposit Status
+
+            Status  | Description
+            ----------|-------------
+            0 | pending
+            1 | open
+            2 | done
+            3 | canceled
+          in: query
+          name: status
+          type: integer
+        - description: Boolean to find pending deposits without travel rule information. To find your pending deposits combine this filter with status=0 in request
+
+          in: query
+          name: pending_travel_rule
+          type: boolean
       produces:
         - application/json
       responses:
@@ -1992,6 +2219,48 @@ paths:
       security:
         - Bearer: [ ]
       summary: List Deposits
+      tags:
+        - Wallet
+  /accounts/{accountId}/wallet/{symbol}/deposits/{depositId}:
+    patch:
+      consumes:
+        - application/json
+      description: |-
+        Inform Travel Rule data to credit a pending deposit.
+
+        <b>LEGAL INFORMATION:</b> All cryptocurrency deposits processed from 2026-05-01 must include "travel rule" information in accordance with Brazilian law.
+      parameters:
+        - description: Account identifier. Obtained from List Accounts
+          in: path
+          name: accountId
+          required: true
+          type: string
+        - description: Cryptocurrency or fiat, ex BTC, BRL, ETH.
+          in: path
+          name: symbol
+          required: true
+          type: string
+        - description: Deposit identifier. Obtained from List Deposits
+          in: path
+          name: depositId
+          required: true
+          type: string
+        - description: Request
+          in: body
+          name: payload
+          required: true
+          schema:
+            $ref: '#/definitions/TravelRuleDepositRequest'
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Response
+          schema:
+            $ref: '#/definitions/Withdraw'
+      security:
+        - Bearer: [ ]
+      summary: Release Pending Deposit
       tags:
         - Wallet
   /accounts/{accountId}/wallet/{symbol}/deposits/addresses:
@@ -2085,16 +2354,12 @@ paths:
         with "BRL", a withdraw will be made to the informed banking account. If the coin field is filled
         with a cryptocurrency, a withdraw will be made to the informed wallet address.
 
-        <b>IMPORTANT:</b> It's only allowed the transfer to "reliable" destinations. The need to mark as
-        safe a wallet address or banking account is a security measure. For cryptocurrency transfer,
-        it's also needed email approval for the transfer. To mark a wallet address or banking account
-        as "reliable", you need to have activates the
-        ["Two-Factor Authentication (2FA)"](https://www.mercadobitcoin.com.br/twostep/) and have a
-        ["Security PIN"](https://www.mercadobitcoin.com.br/configuracoes/palavrasegura/). This feature is available
-        for all users that have an active API Trade Key.
-        You can configure reliable destinations at
-        ["Address Register"](https://www.mercadobitcoin.com.br/configuracoes/cadastro_endereco/) and/or
-        ["Banking Accounts"](https://www.mercadobitcoin.com.br/configuracoes/contasbancarias/).
+        <b>IMPORTANT:</b> It's only allowed the transfer to "reliable" destinations. The need to mark as safe a wallet address or banking account is a security measure.
+        * To mark a wallet address or banking account as "reliable", you need to have activates the ["Two-Factor Authentication (2FA)"](https://www.mercadobitcoin.com.br/twostep/).
+        * This feature is available for all users that have an active API Trade Key.
+        * You can configure reliable destinations at ["Address Register"](https://www.mercadobitcoin.com.br/configuracoes/cadastro_endereco/).
+
+        <b>LEGAL INFORMATION:</b> All cryptocurrency withdrawal requests made from 2026-05-01 must include "travel rule" information in accordance with Brazilian law.
       parameters:
         - description: Account identifier. Obtained from List Accounts
           in: path
